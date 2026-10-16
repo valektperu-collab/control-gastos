@@ -44,7 +44,7 @@
     .tab-content { display: none; }
     .tab-content.active { display: block; }
     .tx-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.82rem; }
-    .val-danger { color: var(--danger); } .val-warning { color: var(--warning); } .val-success { color: var(--success); } .val-accent { color: var(--accent); }
+    .val-danger { color: var(--danger); } .val-warning { color: var(--warning); } .val-success { color: var(--success); } .val-accent { color: var(--accent); } .val-purple { color: var(--purple); }
   </style>
 </head>
 <body>
@@ -55,7 +55,7 @@
       <h1>Control de Gastos Pro</h1>
       <div style="display:flex; align-items:center; gap:5px;">
         <span id="sync-badge" class="btn-pill" style="color:var(--success); border-color:rgba(16,185,129,0.3)">☁ Sincronizado</span>
-        <button class="btn-pill" id="btn-privacy" onclick="togglePrivacy()">Ocultar</button>
+        <button class="btn-pill" id="btn-privacy" onclick="togglePrivacy()">Ver</button>
         <button class="btn-pill" style="color:var(--accent)" onclick="confirmNewCycle()">+ Ciclo</button>
       </div>
     </div>
@@ -70,15 +70,15 @@
     <!-- HERO CARD -->
     <div class="card hero-card" id="hero-card">
       <div class="balance-title">Margen Libre Real (Ciclo Actual)</div>
-      <div id="disp-free" class="balance-amount val-success">S/ 0.00</div>
+      <div id="disp-free" class="balance-amount val-success">S/ ••••</div>
       <div class="grid-2" style="margin-top:8px;">
-        <div><div class="stat-label">Bolsillo Real (Ef + Bco)</div><div id="disp-liquid" class="stat-val">S/ 0.00</div></div>
-        <div><div class="stat-label">Comprometido en Sobres</div><div id="disp-committed" class="stat-val val-warning">S/ 0.00</div></div>
+        <div><div class="stat-label">Bolsillo Real (Ef + Bco)</div><div id="disp-liquid" class="stat-val">S/ ••••</div></div>
+        <div><div class="stat-label">Comprometido en Sobres</div><div id="disp-committed" class="stat-val val-warning">S/ ••••</div></div>
       </div>
       <div class="summary-line">
-        <span>Ingresos: <strong id="sum-inc">S/ 0.00</strong></span>
-        <span>Gastos: <strong id="sum-exp" class="val-danger">S/ 0.00</strong></span>
-        <span>Ahorro/Meta: <strong id="sum-prov" class="val-accent">S/ 0.00</strong></span>
+        <span>Ingresos: <strong id="sum-inc">S/ ••••</strong></span>
+        <span>Gastos: <strong id="sum-exp" class="val-danger">S/ ••••</strong></span>
+        <span>Ahorro/Meta: <strong id="sum-prov" class="val-accent">S/ ••••</strong></span>
       </div>
     </div>
 
@@ -91,17 +91,17 @@
       <div class="grid-3">
         <div class="account-box">
           <div class="stat-label">Efectivo</div>
-          <div id="acc-cash" class="account-balance">S/ 0.00</div>
+          <div id="acc-cash" class="account-balance">S/ ••••</div>
           <button class="btn-link" onclick="reconcile('cash')">Sincerar</button>
         </div>
         <div class="account-box">
           <div class="stat-label">Banco / Yape</div>
-          <div id="acc-bank" class="account-balance">S/ 0.00</div>
+          <div id="acc-bank" class="account-balance">S/ ••••</div>
           <button class="btn-link" onclick="reconcile('bank')">Sincerar</button>
         </div>
         <div class="account-box">
           <div class="stat-label">Reserva / Bono</div>
-          <div id="acc-reserve" class="account-balance val-accent">S/ 0.00</div>
+          <div id="acc-reserve" class="account-balance val-accent">S/ ••••</div>
           <button class="btn-link" onclick="reconcile('reserve')">Sincerar</button>
         </div>
       </div>
@@ -143,12 +143,12 @@
         <label>De Cuenta</label>
         <select id="tx-from"><option value="bank">Banco / Yape</option><option value="cash">Efectivo</option><option value="reserve">Reserva</option></select>
         <label>A Cuenta</label>
-        <select id="tx-to"><option value="cash">Efectivo</option><option value="bank">Banco / Yape</option><option value="reserve">Reserva</option></select>
+        <select id="tx-to"><option value="reserve">Reserva (Bono/Ahorro)</option><option value="cash">Efectivo</option><option value="bank">Banco / Yape</option></select>
       </div>
 
       <div id="grp-single">
         <label>Cuenta de Pago / Ingreso</label>
-        <select id="tx-account"><option value="cash">Efectivo (Bolsillo)</option><option value="bank">Banco / Yape</option><option value="reserve">Reserva</option></select>
+        <select id="tx-account"><option value="cash">Efectivo (Bolsillo)</option><option value="bank">Banco / Yape</option><option value="reserve">Reserva / Bono</option></select>
       </div>
 
       <label>Descripción</label>
@@ -176,18 +176,51 @@
     <div class="card" id="tx-history"></div>
   </div>
 
-  <!-- TAB 4: PLANIFICADOR (RESTABLECIDO) -->
+  <!-- TAB 4: PLANIFICADOR (COMPLETO) -->
   <div id="tab-plan" class="tab-content">
-    <div class="header"><h1>Planificador y Sobres</h1></div>
+    <div class="header"><h1>Planificador, Sobres y Ahorro</h1></div>
+    
+    <!-- SOBRES -->
     <div class="card">
-      <span style="font-size:0.8rem; font-weight:700; margin-bottom:8px; display:block;">Topes de Sobres</span>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <span style="font-size:0.8rem; font-weight:700;">Topes de Sobres</span>
+        <button class="btn-link" onclick="promptAddCategory()">+ Nueva Categoría</button>
+      </div>
       <div id="sliders-box"></div>
       <button class="btn-main" style="margin-top:8px;" onclick="saveLimits()">Guardar Topes</button>
+    </div>
+
+    <!-- METAS Y AHORROS -->
+    <div class="card">
+      <span style="font-size:0.8rem; font-weight:700; margin-bottom:8px; display:block;">Metas de Ahorro</span>
+      <div id="goals-list-plan"></div>
+      <div style="border-top:1px solid var(--border); padding-top:8px; margin-top:8px;">
+        <label>Nombre de la Meta</label>
+        <input type="text" id="new-goal-name" placeholder="Ej. Ahorro Hijo, Ropa">
+        <label>Monto Objetivo (S/)</label>
+        <input type="number" id="new-goal-target" placeholder="Ej. 500.00">
+        <button class="btn-main" onclick="addGoal()">+ Crear Meta</button>
+      </div>
+    </div>
+
+    <!-- PROVISIONES Y DEUDAS -->
+    <div class="card">
+      <span style="font-size:0.8rem; font-weight:700; margin-bottom:8px; display:block;">Compromisos y Deudas Fijas</span>
+      <div id="debts-list"></div>
+      <div style="border-top:1px solid var(--border); padding-top:8px; margin-top:8px;">
+        <label>Concepto</label>
+        <input type="text" id="new-debt-name" placeholder="Ej. Deuda Massiel, Teléfono">
+        <div class="grid-2">
+          <div><label>Monto (S/)</label><input type="number" id="new-debt-amt" placeholder="Ej. 60.00"></div>
+          <div><label>Día Pago</label><input type="number" id="new-debt-day" placeholder="Ej. 15"></div>
+        </div>
+        <button class="btn-main" onclick="addDebt()">+ Guardar Compromiso</button>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- NAVEGADOR INFERIOR CON LOS 4 BOTONES -->
+<!-- NAVEGADOR INFERIOR -->
 <div class="nav-tabs">
   <button class="nav-btn active" onclick="switchTab('dash', this)">Panel</button>
   <button class="nav-btn" onclick="switchTab('add', this)">Registro</button>
@@ -202,9 +235,14 @@
   var chartFilter = 'ciclo';
 
   var state = {
-    cfg: { lastCycleStart: Date.now() - (7 * 86400000), income: 480.00 },
+    cfg: { lastCycleStart: 0, income: 480.00 },
     accounts: { cash: 0.00, bank: 0.00, reserve: 0.00 },
-    limits: { "Comida": 60, "Transporte": 60, "Cena": 60, "Aseo": 60, "Desayuno": 20, "Pasaje hijo": 60, "Comida hijos": 115.47, "Margen Libre": 9.89 },
+    limits: { "Comida": 60, "Transporte": 60, "Comida hijos": 120, "Pasaje hijo": 80, "Aseo": 20, "Margen Libre": 10 },
+    goals: [],
+    debts: [
+      { id: 1, name: "Deuda Massiel", amount: 30.00, dueDay: 13 },
+      { id: 2, name: "Pago teléfono", amount: 30.00, dueDay: 9 }
+    ],
     txs: []
   };
 
@@ -222,30 +260,52 @@
       .then(function(cloud) {
         if (cloud && Array.isArray(cloud.txs)) {
           state.txs = cloud.txs;
-          if (cloud.limits) state.limits = cloud.limits;
-          computeLiveBalances();
+          if (cloud.limits && Object.keys(cloud.limits).length > 0) state.limits = cloud.limits;
+          if (cloud.goals && cloud.goals.length > 0) state.goals = cloud.goals;
+          
+          computeAccountsFromTxs();
           localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
           render();
           if (badge) { badge.textContent = '☁ Sincronizado'; badge.style.color = 'var(--success)'; }
         }
       }).catch(function(err) {
-        console.warn("Error al sincronizar con Google Sheets:", err);
+        console.warn("Error al sincronizar:", err);
         if (badge) { badge.textContent = '☁ Local'; badge.style.color = 'var(--muted)'; }
       });
   }
 
-  function computeLiveBalances() {
+  // Calcula exactamente los saldos de Efectivo, Banco y Reserva de las transacciones
+  function computeAccountsFromTxs() {
     var c = 0, b = 0, r = 0;
+    var latestCycleStart = 0;
+
+    // Detecta automáticamente el último ciclo iniciado
+    state.txs.forEach(function(t) {
+      if (t.type === 'ingreso' && (t.desc || '').includes('Sueldo Ciclo')) {
+        var ts = t.timestamp || new Date(t.date).getTime() || 0;
+        if (ts > latestCycleStart) latestCycleStart = ts;
+      }
+    });
+    if (latestCycleStart > 0) state.cfg.lastCycleStart = latestCycleStart;
+
     state.txs.forEach(function(t) {
       var amt = parseFloat(t.amount) || 0;
       var acc = (t.account || '').toLowerCase();
-      var isCash = acc.includes('efectivo') || acc.includes('cash');
-      var isBank = acc.includes('banco') || acc.includes('yape') || acc.includes('bank');
 
-      if (t.type === 'ingreso') {
-        if (isCash) c += amt; else if (isBank) b += amt; else r += amt;
+      if (t.type === 'transfer') {
+        if (acc.includes('cash a reserve') || acc.includes('efectivo a reserva')) { c -= amt; r += amt; }
+        else if (acc.includes('bank a reserve') || acc.includes('banco a reserva')) { b -= amt; r += amt; }
+        else if (acc.includes('reserve a cash')) { r -= amt; c += amt; }
+        else if (acc.includes('bank a cash')) { b -= amt; c += amt; }
+        else if (acc.includes('cash a bank')) { c -= amt; b += amt; }
+      } else if (t.type === 'ingreso') {
+        if (acc.includes('reserva') || acc.includes('reserve')) r += amt;
+        else if (acc.includes('banco') || acc.includes('bank') || acc.includes('yape')) b += amt;
+        else c += amt;
       } else if (t.type === 'gasto') {
-        if (isCash) c -= amt; else if (isBank) b -= amt; else r -= amt;
+        if (acc.includes('reserva') || acc.includes('reserve')) r -= amt;
+        else if (acc.includes('banco') || acc.includes('bank') || acc.includes('yape')) b -= amt;
+        else c -= amt;
       }
     });
 
@@ -268,13 +328,18 @@
     });
   }
 
+  // Borrado con GET y POST para asegurar eliminación en Drive
   function deleteTx(id) {
-    if (!confirm("¿Eliminar este registro permanentemente de Google Sheets y de todos los dispositivos?")) return;
+    if (!confirm("¿Eliminar este registro permanentemente de Google Drive y de todos los dispositivos?")) return;
+    
     state.txs = state.txs.filter(function(t) { return String(t.id) !== String(id); });
-    computeLiveBalances();
+    computeAccountsFromTxs();
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
     render();
 
+    // 1. Envío GET
+    fetch(DRIVE_API_URL + "?action=delete&id=" + encodeURIComponent(id), { mode: 'no-cors' });
+    // 2. Envío POST por compatibilidad
     fetch(DRIVE_API_URL, {
       method: 'POST',
       mode: 'no-cors',
@@ -315,25 +380,25 @@
     var num = parseFloat(inc);
     if (isNaN(num) || num <= 0) return alert("Monto inválido.");
 
-    var acc = prompt("¿Dónde ingresó el dinero?\n1 = Banco / Yape\n2 = Efectivo", "1");
-    var target = (acc === '2') ? 'cash' : 'bank';
-    state.cfg.lastCycleStart = Date.now();
-
+    var acc = prompt("¿Dónde ingresó el dinero?\n1 = Efectivo\n2 = Banco / Yape", "1");
+    var target = (acc === '2') ? 'Banco/Yape' : 'Efectivo';
     var now = new Date();
+    state.cfg.lastCycleStart = now.getTime();
+
     var txObj = {
       id: String(Date.now()),
       type: 'ingreso',
       desc: 'Sueldo Ciclo Semanal',
       amount: num,
       category: 'Sueldo Base',
-      account: target === 'cash' ? 'Efectivo' : 'Banco/Yape',
+      account: target,
       isAnt: false,
       timestamp: now.getTime(),
       date: now.toISOString()
     };
 
     state.txs.unshift(txObj);
-    computeLiveBalances();
+    computeAccountsFromTxs();
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
     render();
     pushSingleTx(txObj);
@@ -348,7 +413,7 @@
 
     var accStr = prompt("¿Con qué pagas?\n1 = Efectivo\n2 = Banco / Yape", "1");
     if (!accStr) return;
-    var accKey = (accStr.trim() === '2') ? 'bank' : 'cash';
+    var accKey = (accStr.trim() === '2') ? 'Banco/Yape' : 'Efectivo';
 
     var now = new Date();
     var txObj = {
@@ -357,14 +422,14 @@
       desc: desc,
       amount: amt,
       category: cat,
-      account: accKey === 'cash' ? 'Efectivo' : 'Banco/Yape',
+      account: accKey,
       isAnt: !!isAnt,
       timestamp: now.getTime(),
       date: now.toISOString()
     };
 
     state.txs.unshift(txObj);
-    computeLiveBalances();
+    computeAccountsFromTxs();
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
     render();
     pushSingleTx(txObj);
@@ -382,7 +447,7 @@
     if (!sel) return;
     sel.innerHTML = '';
     var cats = Object.keys(state.limits);
-    if (cats.length === 0) cats = ["Transporte", "Comida", "Margen Libre", "Aseo", "Otros"];
+    if (cats.length === 0) cats = ["Transporte", "Comida", "Comida hijos", "Pasaje hijo", "Aseo", "Margen Libre"];
     cats.forEach(function(c) {
       var opt = document.createElement('option'); opt.value = c; opt.textContent = c; sel.appendChild(opt);
     });
@@ -412,7 +477,7 @@
       var to = document.getElementById('tx-to').value;
       if (from === to) return alert("Las cuentas deben ser diferentes.");
       txObj.category = 'Transferencia';
-      txObj.account = 'De ' + from + ' a ' + to;
+      txObj.account = from + ' a ' + to;
     } else {
       var acc = document.getElementById('tx-account').value;
       txObj.account = acc === 'cash' ? 'Efectivo' : (acc === 'bank' ? 'Banco/Yape' : 'Reserva');
@@ -425,7 +490,7 @@
     }
 
     state.txs.unshift(txObj);
-    computeLiveBalances();
+    computeAccountsFromTxs();
     document.getElementById('tx-desc').value = '';
     document.getElementById('tx-amount').value = '';
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
@@ -456,12 +521,11 @@
         date: new Date().toISOString()
       };
       state.txs.unshift(txObj);
+      computeAccountsFromTxs();
+      localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
+      render();
       pushSingleTx(txObj);
     }
-
-    state.accounts[key] = num;
-    localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
-    render();
   }
 
   function openTransferModal() {
@@ -550,7 +614,7 @@
       document.getElementById('disp-committed').textContent = fmt(committedEnvelopes);
       document.getElementById('sum-inc').textContent = fmt(cycleIncome);
       document.getElementById('sum-exp').textContent = fmt(cycleExpenses);
-      document.getElementById('sum-prov').textContent = fmt(0);
+      document.getElementById('sum-prov').textContent = fmt(state.accounts.reserve);
 
       renderChartAndRanking(catExpensesFiltered);
       renderHistory();
@@ -618,10 +682,11 @@
         var item = document.createElement('div');
         item.className = 'tx-item';
         var isGasto = tx.type === 'gasto';
-        var sign = isGasto ? '-' : '+';
-        var col = isGasto ? 'var(--danger)' : 'var(--success)';
+        var isIngreso = tx.type === 'ingreso';
+        var sign = isGasto ? '-' : (isIngreso ? '+' : '⇄');
+        var col = isGasto ? 'var(--danger)' : (isIngreso ? 'var(--success)' : 'var(--accent)');
 
-        item.innerHTML = '<div><strong>' + tx.desc + '</strong><br><span style="font-size:0.68rem; color:var(--muted)">' + (tx.date ? tx.date.slice(0, 10) : '') + ' · ' + (tx.category || '') + '</span></div>' +
+        item.innerHTML = '<div><strong>' + tx.desc + '</strong><br><span style="font-size:0.68rem; color:var(--muted)">' + (tx.date ? tx.date.slice(0, 10) : '') + ' · ' + (tx.category || '') + ' (' + (tx.account || '') + ')</span></div>' +
           '<div style="display:flex; align-items:center; gap:8px;">' +
           '<span style="font-weight:800; color:' + col + '">' + sign + ' ' + fmt(tx.amount) + '</span>' +
           '<button class="btn-link" style="color:var(--danger); font-size:0.85rem; font-weight:900;" onclick="deleteTx(\'' + tx.id + '\')">✕</button>' +
@@ -633,20 +698,86 @@
 
   function loadPlanSliders() {
     var box = document.getElementById('sliders-box');
-    if (!box) return;
-    box.innerHTML = '';
-    Object.keys(state.limits).forEach(function(c) {
-      var row = document.createElement('div');
-      row.style.marginBottom = '6px';
-      row.innerHTML = '<div style="display:flex; justify-content:space-between; font-size:0.75rem;"><strong>' + c + '</strong><span id="sl-val-' + c + '">' + fmt(state.limits[c]) + '</span></div>' +
-        '<input type="range" min="0" max="250" step="5" value="' + state.limits[c] + '" oninput="document.getElementById(\'sl-val-' + c + '\').textContent = fmt(this.value); state.limits[\'' + c + '\'] = parseFloat(this.value);">';
-      box.appendChild(row);
-    });
+    if (box) {
+      box.innerHTML = '';
+      Object.keys(state.limits).forEach(function(c) {
+        var row = document.createElement('div');
+        row.style.marginBottom = '6px';
+        row.innerHTML = '<div style="display:flex; justify-content:space-between; font-size:0.75rem;"><strong>' + c + '</strong><span id="sl-val-' + c + '">' + fmt(state.limits[c]) + '</span></div>' +
+          '<input type="range" min="0" max="250" step="5" value="' + state.limits[c] + '" oninput="document.getElementById(\'sl-val-' + c + '\').textContent = fmt(this.value); state.limits[\'' + c + '\'] = parseFloat(this.value);">';
+        box.appendChild(row);
+      });
+    }
+
+    var gPlan = document.getElementById('goals-list-plan');
+    if (gPlan) {
+      gPlan.innerHTML = '';
+      (state.goals || []).forEach(function(g) {
+        gPlan.innerHTML += '<div style="display:flex; justify-content:space-between; font-size:0.75rem; padding:4px 0;"><span>' + g.name + ' (Meta: ' + fmt(g.target) + ')</span><div><strong>Llevas: ' + fmt(g.current || 0) + '</strong> <button class="btn-link" style="color:var(--danger)" onclick="deleteGoal(\'' + g.id + '\')">[X]</button></div></div>';
+      });
+    }
+
+    var debtsBox = document.getElementById('debts-list');
+    if (debtsBox) {
+      debtsBox.innerHTML = '';
+      (state.debts || []).forEach(function(d) {
+        debtsBox.innerHTML += '<div style="display:flex; justify-content:space-between; font-size:0.75rem; padding:4px 0;"><span>' + d.name + ' (Día ' + d.dueDay + ')</span><div><strong>' + fmt(d.amount) + '</strong> <button class="btn-link" style="color:var(--danger)" onclick="deleteDebt(' + d.id + ')">[X]</button></div></div>';
+      });
+    }
+  }
+
+  function promptAddCategory() {
+    var name = prompt("Nombre de la nueva categoría / sobre:");
+    if (!name) return;
+    var limit = parseFloat(prompt("Tope presupuestado semanal (S/):", "50.00")) || 0;
+    state.limits[name] = limit;
+    localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
+    loadPlanSliders();
+    render();
+  }
+
+  function addGoal() {
+    var name = document.getElementById('new-goal-name').value.trim();
+    var target = parseFloat(document.getElementById('new-goal-target').value);
+    if (!name || isNaN(target) || target <= 0) return alert("Completa nombre y objetivo válido.");
+    state.goals.push({ id: String(Date.now()), name: name, target: target, current: 0.00 });
+    document.getElementById('new-goal-name').value = '';
+    document.getElementById('new-goal-target').value = '';
+    localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
+    loadPlanSliders();
+  }
+
+  function deleteGoal(id) {
+    if (confirm("¿Eliminar esta meta?")) {
+      state.goals = state.goals.filter(function(x) { return String(x.id) !== String(id); });
+      localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
+      loadPlanSliders();
+    }
+  }
+
+  function addDebt() {
+    var name = document.getElementById('new-debt-name').value.trim();
+    var amt = parseFloat(document.getElementById('new-debt-amt').value);
+    var day = parseInt(document.getElementById('new-debt-day').value) || 15;
+    if (!name || isNaN(amt) || amt <= 0) return alert("Completa concepto y monto válido.");
+    state.debts.push({ id: Date.now(), name: name, amount: amt, dueDay: day });
+    document.getElementById('new-debt-name').value = '';
+    document.getElementById('new-debt-amt').value = '';
+    localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
+    loadPlanSliders();
+  }
+
+  function deleteDebt(id) {
+    if (confirm("¿Eliminar este compromiso?")) {
+      state.debts = state.debts.filter(function(x) { return x.id !== id; });
+      localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
+      loadPlanSliders();
+    }
   }
 
   function saveLimits() {
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
-    alert("Topes guardados.");
+    alert("Topes guardados con éxito.");
     switchTab('dash', document.querySelectorAll('.nav-btn')[0]);
   }
 
