@@ -78,7 +78,7 @@
       <div class="summary-line">
         <span>Ingresos: <strong id="sum-inc">S/ ••••</strong></span>
         <span>Gastos: <strong id="sum-exp" class="val-danger">S/ ••••</strong></span>
-        <span>Ahorro/Meta: <strong id="sum-prov" class="val-accent">S/ ••••</strong></span>
+        <span>Reserva: <strong id="sum-prov" class="val-accent">S/ ••••</strong></span>
       </div>
     </div>
 
@@ -141,7 +141,7 @@
 
       <div id="grp-transfer" style="display:none;">
         <label>De Cuenta</label>
-        <select id="tx-from"><option value="bank">Banco / Yape</option><option value="cash">Efectivo</option><option value="reserve">Reserva</option></select>
+        <select id="tx-from"><option value="cash">Efectivo</option><option value="bank">Banco / Yape</option><option value="reserve">Reserva</option></select>
         <label>A Cuenta</label>
         <select id="tx-to"><option value="reserve">Reserva (Bono/Ahorro)</option><option value="cash">Efectivo</option><option value="bank">Banco / Yape</option></select>
       </div>
@@ -176,7 +176,7 @@
     <div class="card" id="tx-history"></div>
   </div>
 
-  <!-- TAB 4: PLANIFICADOR (COMPLETO CON PROVISIONES) -->
+  <!-- TAB 4: PLANIFICADOR (COMPLETO) -->
   <div id="tab-plan" class="tab-content">
     <div class="header"><h1>Planificador, Sobres y Ahorro</h1></div>
     
@@ -190,13 +190,13 @@
       <button class="btn-main" style="margin-top:8px;" onclick="saveLimits()">Guardar Topes</button>
     </div>
 
-    <!-- 2. PROVISIONES MENSUALES (SERVICIOS: TELÉFONO, LUZ, INTERNET, AGUA, COCHERA) -->
+    <!-- 2. PROVISIONES MENSUALES -->
     <div class="card">
       <span style="font-size:0.8rem; font-weight:700; margin-bottom:8px; display:block;">Provisiones Mensuales (Luz, Teléfono, Internet, Cochera)</span>
       <div id="provs-list"></div>
       <div style="border-top:1px solid var(--border); padding-top:8px; margin-top:8px;">
         <label>Nombre del Servicio</label>
-        <input type="text" id="new-prov-name" placeholder="Ej. Teléfono, Recibo de Luz, Internet">
+        <input type="text" id="new-prov-name" placeholder="Ej. Teléfono, Recibo de Luz">
         <div class="grid-2">
           <div><label>Monto Mensual (S/)</label><input type="number" id="new-prov-amt" placeholder="Ej. 40.00"></div>
           <div><label>Día de Vencimiento</label><input type="number" id="new-prov-day" placeholder="Ej. 10"></div>
@@ -205,7 +205,7 @@
       </div>
     </div>
 
-    <!-- 3. COMPROMISOS Y DEUDAS FIJAS -->
+    <!-- 3. COMPROMISOS Y DEUDAS -->
     <div class="card">
       <span style="font-size:0.8rem; font-weight:700; margin-bottom:8px; display:block;">Compromisos y Deudas Fijas</span>
       <div id="debts-list"></div>
@@ -220,7 +220,7 @@
       </div>
     </div>
 
-    <!-- 4. METAS Y AHORROS -->
+    <!-- 4. METAS DE AHORRO -->
     <div class="card">
       <span style="font-size:0.8rem; font-weight:700; margin-bottom:8px; display:block;">Metas de Ahorro</span>
       <div id="goals-list-plan"></div>
@@ -251,12 +251,12 @@
 
   var state = {
     cfg: { lastCycleStart: 0, income: 480.00 },
-    accounts: { cash: 0.00, bank: 0.00, reserve: 0.00 },
+    accounts: { cash: 142.50, bank: 0.00, reserve: 0.00 },
     limits: { "Comida": 60, "Transporte": 60, "Comida hijos": 120, "Pasaje hijo": 80, "Aseo": 20, "Margen Libre": 10 },
     provisions: [
-      { id: 1, name: "Teléfono", amount: 40.00, dueDay: 10, saved: 10.00 },
-      { id: 2, name: "Cochera", amount: 150.00, dueDay: 28, saved: 0.00 },
-      { id: 3, name: "Luz / Internet", amount: 80.00, dueDay: 20, saved: 0.00 }
+      { id: 1, name: "Teléfono", amount: 40.00, dueDay: 10 },
+      { id: 2, name: "Cochera", amount: 150.00, dueDay: 28 },
+      { id: 3, name: "Luz / Internet", amount: 80.00, dueDay: 20 }
     ],
     debts: [
       { id: 1, name: "Deuda Massiel", amount: 30.00, dueDay: 13 }
@@ -280,25 +280,27 @@
       .then(function(res) { return res.json(); })
       .then(function(cloud) {
         if (cloud && Array.isArray(cloud.txs)) {
-          state.txs = cloud.txs;
+          // Filtra cualquier fila espuria de ajuste automático
+          state.txs = cloud.txs.filter(function(t) {
+            return t.category !== 'Ajuste de Saldo' && !(t.desc || '').includes('Sinceramiento');
+          });
+
           if (cloud.limits && Object.keys(cloud.limits).length > 0) state.limits = cloud.limits;
           if (cloud.goals && cloud.goals.length > 0) state.goals = cloud.goals;
           
-          computeAccountsFromTxs();
+          findLatestCycle();
           localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
           render();
           if (badge) { badge.textContent = '☁ Sincronizado'; badge.style.color = 'var(--success)'; }
         }
       }).catch(function(err) {
-        console.warn("Error al sincronizar:", err);
+        console.warn("Offline:", err);
         if (badge) { badge.textContent = '☁ Local'; badge.style.color = 'var(--muted)'; }
       });
   }
 
-  function computeAccountsFromTxs() {
-    var c = 0, b = 0, r = 0;
+  function findLatestCycle() {
     var latestCycleStart = 0;
-
     state.txs.forEach(function(t) {
       if (t.type === 'ingreso' && (t.desc || '').includes('Sueldo Ciclo')) {
         var ts = t.timestamp || new Date(t.date).getTime() || 0;
@@ -306,31 +308,6 @@
       }
     });
     if (latestCycleStart > 0) state.cfg.lastCycleStart = latestCycleStart;
-
-    state.txs.forEach(function(t) {
-      var amt = parseFloat(t.amount) || 0;
-      var acc = (t.account || '').toLowerCase();
-
-      if (t.type === 'transfer') {
-        if (acc.includes('cash a reserve') || acc.includes('efectivo a reserva')) { c -= amt; r += amt; }
-        else if (acc.includes('bank a reserve') || acc.includes('banco a reserva')) { b -= amt; r += amt; }
-        else if (acc.includes('reserve a cash')) { r -= amt; c += amt; }
-        else if (acc.includes('bank a cash')) { b -= amt; c += amt; }
-        else if (acc.includes('cash a bank')) { c -= amt; b += amt; }
-      } else if (t.type === 'ingreso') {
-        if (acc.includes('reserva') || acc.includes('reserve')) r += amt;
-        else if (acc.includes('banco') || acc.includes('bank') || acc.includes('yape')) b += amt;
-        else c += amt;
-      } else if (t.type === 'gasto') {
-        if (acc.includes('reserva') || acc.includes('reserve')) r -= amt;
-        else if (acc.includes('banco') || acc.includes('bank') || acc.includes('yape')) b -= amt;
-        else c += amt;
-      }
-    });
-
-    state.accounts.cash = Math.max(0, c);
-    state.accounts.bank = Math.max(0, b);
-    state.accounts.reserve = Math.max(0, r);
   }
 
   function pushSingleTx(tx) {
@@ -349,9 +326,7 @@
 
   function deleteTx(id) {
     if (!confirm("¿Eliminar este registro permanentemente de Google Drive y de todos los dispositivos?")) return;
-    
     state.txs = state.txs.filter(function(t) { return String(t.id) !== String(id); });
-    computeAccountsFromTxs();
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
     render();
 
@@ -397,7 +372,8 @@
     if (isNaN(num) || num <= 0) return alert("Monto inválido.");
 
     var acc = prompt("¿Dónde ingresó el dinero?\n1 = Efectivo\n2 = Banco / Yape", "1");
-    var target = (acc === '2') ? 'Banco/Yape' : 'Efectivo';
+    var target = (acc === '2') ? 'bank' : 'cash';
+    state.accounts[target] += num;
     var now = new Date();
     state.cfg.lastCycleStart = now.getTime();
 
@@ -407,14 +383,13 @@
       desc: 'Sueldo Ciclo Semanal',
       amount: num,
       category: 'Sueldo Base',
-      account: target,
+      account: target === 'cash' ? 'Efectivo' : 'Banco/Yape',
       isAnt: false,
       timestamp: now.getTime(),
       date: now.toISOString()
     };
 
     state.txs.unshift(txObj);
-    computeAccountsFromTxs();
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
     render();
     pushSingleTx(txObj);
@@ -429,8 +404,9 @@
 
     var accStr = prompt("¿Con qué pagas?\n1 = Efectivo\n2 = Banco / Yape", "1");
     if (!accStr) return;
-    var accKey = (accStr.trim() === '2') ? 'Banco/Yape' : 'Efectivo';
+    var accKey = (accStr.trim() === '2') ? 'bank' : 'cash';
 
+    state.accounts[accKey] -= amt;
     var now = new Date();
     var txObj = {
       id: String(Date.now()),
@@ -438,14 +414,13 @@
       desc: desc,
       amount: amt,
       category: cat,
-      account: accKey,
+      account: accKey === 'cash' ? 'Efectivo' : 'Banco/Yape',
       isAnt: !!isAnt,
       timestamp: now.getTime(),
       date: now.toISOString()
     };
 
     state.txs.unshift(txObj);
-    computeAccountsFromTxs();
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
     render();
     pushSingleTx(txObj);
@@ -492,21 +467,24 @@
       var from = document.getElementById('tx-from').value;
       var to = document.getElementById('tx-to').value;
       if (from === to) return alert("Las cuentas deben ser diferentes.");
+      state.accounts[from] -= amt;
+      state.accounts[to] += amt;
       txObj.category = 'Transferencia';
-      txObj.account = from + ' a ' + to;
+      txObj.account = 'De ' + from + ' a ' + to;
     } else {
       var acc = document.getElementById('tx-account').value;
       txObj.account = acc === 'cash' ? 'Efectivo' : (acc === 'bank' ? 'Banco/Yape' : 'Reserva');
       if (type === 'gasto') {
         txObj.category = document.getElementById('tx-cat').value;
         txObj.isAnt = document.getElementById('tx-ant').checked;
+        state.accounts[acc] -= amt;
       } else {
         txObj.category = 'Ingreso Extra';
+        state.accounts[acc] += amt;
       }
     }
 
     state.txs.unshift(txObj);
-    computeAccountsFromTxs();
     document.getElementById('tx-desc').value = '';
     document.getElementById('tx-amount').value = '';
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
@@ -515,6 +493,7 @@
     switchTab('dash', document.querySelectorAll('.nav-btn')[0]);
   }
 
+  // SINCERAR LIMPIO: Guarda el monto exacto sin inyectar filas de gasto en Google Sheets
   function reconcile(key) {
     var val = state.accounts[key];
     var names = { cash: 'Efectivo', bank: 'Banco / Yape', reserve: 'Reserva' };
@@ -523,25 +502,9 @@
     var num = parseFloat(input);
     if (isNaN(num) || num < 0) return alert("Monto inválido.");
 
-    var diff = num - val;
-    if (Math.abs(diff) > 0.01) {
-      var txObj = {
-        id: String(Date.now()),
-        type: diff > 0 ? 'ingreso' : 'gasto',
-        desc: 'Sinceramiento (' + names[key] + ')',
-        amount: Math.abs(diff),
-        category: 'Ajuste de Saldo',
-        account: names[key],
-        isAnt: false,
-        timestamp: Date.now(),
-        date: new Date().toISOString()
-      };
-      state.txs.unshift(txObj);
-      computeAccountsFromTxs();
-      localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
-      render();
-      pushSingleTx(txObj);
-    }
+    state.accounts[key] = num;
+    localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
+    render();
   }
 
   function openTransferModal() {
@@ -592,7 +555,7 @@
           matchFilter = (dObj.getMonth() === now.getMonth() && dObj.getFullYear() === now.getFullYear());
         }
 
-        if (matchFilter && t.type === 'gasto' && t.category !== 'Transferencia') {
+        if (matchFilter && t.type === 'gasto' && t.category !== 'Transferencia' && t.category !== 'Ajuste de Saldo') {
           catExpensesFiltered[t.category] = (catExpensesFiltered[t.category] || 0) + t.amount;
         }
       });
@@ -698,9 +661,8 @@
         var item = document.createElement('div');
         item.className = 'tx-item';
         var isGasto = tx.type === 'gasto';
-        var isIngreso = tx.type === 'ingreso';
-        var sign = isGasto ? '-' : (isIngreso ? '+' : '⇄');
-        var col = isGasto ? 'var(--danger)' : (isIngreso ? 'var(--success)' : 'var(--accent)');
+        var sign = isGasto ? '-' : (tx.type === 'ingreso' ? '+' : '⇄');
+        var col = isGasto ? 'var(--danger)' : (tx.type === 'ingreso' ? 'var(--success)' : 'var(--accent)');
 
         item.innerHTML = '<div><strong>' + tx.desc + '</strong><br><span style="font-size:0.68rem; color:var(--muted)">' + (tx.date ? tx.date.slice(0, 10) : '') + ' · ' + (tx.category || '') + ' (' + (tx.account || '') + ')</span></div>' +
           '<div style="display:flex; align-items:center; gap:8px;">' +
@@ -713,7 +675,6 @@
   }
 
   function loadPlanSliders() {
-    // 1. Sobres
     var box = document.getElementById('sliders-box');
     if (box) {
       box.innerHTML = '';
@@ -726,7 +687,6 @@
       });
     }
 
-    // 2. Provisiones Mensuales
     var provsBox = document.getElementById('provs-list');
     if (provsBox) {
       provsBox.innerHTML = '';
@@ -738,7 +698,6 @@
       });
     }
 
-    // 3. Compromisos / Deudas
     var debtsBox = document.getElementById('debts-list');
     if (debtsBox) {
       debtsBox.innerHTML = '';
@@ -750,7 +709,6 @@
       });
     }
 
-    // 4. Metas
     var gPlan = document.getElementById('goals-list-plan');
     if (gPlan) {
       gPlan.innerHTML = '';
@@ -779,7 +737,7 @@
     var day = parseInt(document.getElementById('new-prov-day').value) || 10;
     if (!name || isNaN(amt) || amt <= 0) return alert("Completa nombre y monto válido.");
     if (!state.provisions) state.provisions = [];
-    state.provisions.push({ id: Date.now(), name: name, amount: amt, dueDay: day, saved: 0.00 });
+    state.provisions.push({ id: Date.now(), name: name, amount: amt, dueDay: day });
     document.getElementById('new-prov-name').value = '';
     document.getElementById('new-prov-amt').value = '';
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
