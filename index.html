@@ -123,14 +123,8 @@
 
     <!-- SOBRES ACTIVOS -->
     <div class="card">
-      <span style="font-size:0.8rem; font-weight:700; margin-bottom:8px; display:block;">Sobres Presupuestados (Pestaña Topes)</span>
+      <span style="font-size:0.8rem; font-weight:700; margin-bottom:8px; display:block;">Sobres Presupuestados</span>
       <div id="envelopes-list"></div>
-    </div>
-
-    <!-- METAS DE AHORRO -->
-    <div class="card">
-      <span style="font-size:0.8rem; font-weight:700; margin-bottom:8px; display:block;">Metas de Ahorro (Pestaña Metas)</span>
-      <div id="goals-list"></div>
     </div>
   </div>
 
@@ -181,13 +175,24 @@
     <div class="header"><h1>Historial de Transacciones</h1></div>
     <div class="card" id="tx-history"></div>
   </div>
+
+  <!-- TAB 4: PLANIFICADOR (RESTABLECIDO) -->
+  <div id="tab-plan" class="tab-content">
+    <div class="header"><h1>Planificador y Sobres</h1></div>
+    <div class="card">
+      <span style="font-size:0.8rem; font-weight:700; margin-bottom:8px; display:block;">Topes de Sobres</span>
+      <div id="sliders-box"></div>
+      <button class="btn-main" style="margin-top:8px;" onclick="saveLimits()">Guardar Topes</button>
+    </div>
+  </div>
 </div>
 
-<!-- NAVEGADOR INFERIOR -->
+<!-- NAVEGADOR INFERIOR CON LOS 4 BOTONES -->
 <div class="nav-tabs">
   <button class="nav-btn active" onclick="switchTab('dash', this)">Panel</button>
   <button class="nav-btn" onclick="switchTab('add', this)">Registro</button>
   <button class="nav-btn" onclick="switchTab('hist', this)">Historial</button>
+  <button class="nav-btn" onclick="switchTab('plan', this)">Planificador</button>
 </div>
 
 <script>
@@ -199,18 +204,15 @@
   var state = {
     cfg: { lastCycleStart: Date.now() - (7 * 86400000), income: 480.00 },
     accounts: { cash: 0.00, bank: 0.00, reserve: 0.00 },
-    limits: {},
-    goals: [],
+    limits: { "Comida": 60, "Transporte": 60, "Cena": 60, "Aseo": 60, "Desayuno": 20, "Pasaje hijo": 60, "Comida hijos": 115.47, "Margen Libre": 9.89 },
     txs: []
   };
 
-  // 1. Cargar datos de la memoria local primero para respuesta inmediata
   var local = localStorage.getItem('ctrl_gastos_state');
   if (local) {
     try { Object.assign(state, JSON.parse(local)); } catch(e) {}
   }
 
-  // 2. Sincronización oficial con Google Sheets
   function fetchCloudData() {
     var badge = document.getElementById('sync-badge');
     if (badge) { badge.textContent = '☁ Sincronizando...'; badge.style.color = 'var(--warning)'; }
@@ -221,28 +223,24 @@
         if (cloud && Array.isArray(cloud.txs)) {
           state.txs = cloud.txs;
           if (cloud.limits) state.limits = cloud.limits;
-          if (cloud.goals) state.goals = cloud.goals;
-          
-          recalculateBalances();
+          computeLiveBalances();
           localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
           render();
           if (badge) { badge.textContent = '☁ Sincronizado'; badge.style.color = 'var(--success)'; }
         }
       }).catch(function(err) {
-        console.warn("Fallo al conectar con Google Sheets:", err);
+        console.warn("Error al sincronizar con Google Sheets:", err);
         if (badge) { badge.textContent = '☁ Local'; badge.style.color = 'var(--muted)'; }
       });
   }
 
-  // Calcula saldos de Efectivo, Banco y Reserva sumando/restando transacciones reales
-  function recalculateBalances() {
+  function computeLiveBalances() {
     var c = 0, b = 0, r = 0;
     state.txs.forEach(function(t) {
       var amt = parseFloat(t.amount) || 0;
       var acc = (t.account || '').toLowerCase();
       var isCash = acc.includes('efectivo') || acc.includes('cash');
       var isBank = acc.includes('banco') || acc.includes('yape') || acc.includes('bank');
-      var isRes = acc.includes('reserva');
 
       if (t.type === 'ingreso') {
         if (isCash) c += amt; else if (isBank) b += amt; else r += amt;
@@ -251,12 +249,9 @@
       }
     });
 
-    // Se actualizan si no han sido ajustados manualmente
-    if (state.accounts.cash === 0 && state.accounts.bank === 0) {
-      state.accounts.cash = Math.max(0, c);
-      state.accounts.bank = Math.max(0, b);
-      state.accounts.reserve = Math.max(0, r);
-    }
+    state.accounts.cash = Math.max(0, c);
+    state.accounts.bank = Math.max(0, b);
+    state.accounts.reserve = Math.max(0, r);
   }
 
   function pushSingleTx(tx) {
@@ -275,13 +270,11 @@
 
   function deleteTx(id) {
     if (!confirm("¿Eliminar este registro permanentemente de Google Sheets y de todos los dispositivos?")) return;
-    
-    // Quita de la memoria local
     state.txs = state.txs.filter(function(t) { return String(t.id) !== String(id); });
+    computeLiveBalances();
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
     render();
 
-    // Elimina la fila física en la hoja
     fetch(DRIVE_API_URL, {
       method: 'POST',
       mode: 'no-cors',
@@ -308,6 +301,7 @@
     if (target) target.classList.add('active');
     if (btn) btn.classList.add('active');
     if (id === 'add') populateCatSelect();
+    if (id === 'plan') loadPlanSliders();
     if (id === 'dash' || id === 'hist') render();
   }
 
@@ -323,7 +317,6 @@
 
     var acc = prompt("¿Dónde ingresó el dinero?\n1 = Banco / Yape\n2 = Efectivo", "1");
     var target = (acc === '2') ? 'cash' : 'bank';
-    state.accounts[target] += num;
     state.cfg.lastCycleStart = Date.now();
 
     var now = new Date();
@@ -340,6 +333,7 @@
     };
 
     state.txs.unshift(txObj);
+    computeLiveBalances();
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
     render();
     pushSingleTx(txObj);
@@ -356,7 +350,6 @@
     if (!accStr) return;
     var accKey = (accStr.trim() === '2') ? 'bank' : 'cash';
 
-    state.accounts[accKey] -= amt;
     var now = new Date();
     var txObj = {
       id: String(Date.now()),
@@ -371,6 +364,7 @@
     };
 
     state.txs.unshift(txObj);
+    computeLiveBalances();
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
     render();
     pushSingleTx(txObj);
@@ -388,7 +382,7 @@
     if (!sel) return;
     sel.innerHTML = '';
     var cats = Object.keys(state.limits);
-    if (cats.length === 0) cats = ["Transporte", "Comida", "Margen Libre", "Aseo personal", "Otros"];
+    if (cats.length === 0) cats = ["Transporte", "Comida", "Margen Libre", "Aseo", "Otros"];
     cats.forEach(function(c) {
       var opt = document.createElement('option'); opt.value = c; opt.textContent = c; sel.appendChild(opt);
     });
@@ -417,8 +411,6 @@
       var from = document.getElementById('tx-from').value;
       var to = document.getElementById('tx-to').value;
       if (from === to) return alert("Las cuentas deben ser diferentes.");
-      state.accounts[from] -= amt;
-      state.accounts[to] += amt;
       txObj.category = 'Transferencia';
       txObj.account = 'De ' + from + ' a ' + to;
     } else {
@@ -427,14 +419,13 @@
       if (type === 'gasto') {
         txObj.category = document.getElementById('tx-cat').value;
         txObj.isAnt = document.getElementById('tx-ant').checked;
-        state.accounts[acc] -= amt;
       } else {
         txObj.category = 'Ingreso Extra';
-        state.accounts[acc] += amt;
       }
     }
 
     state.txs.unshift(txObj);
+    computeLiveBalances();
     document.getElementById('tx-desc').value = '';
     document.getElementById('tx-amount').value = '';
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
@@ -450,6 +441,23 @@
     if (input === null) return;
     var num = parseFloat(input);
     if (isNaN(num) || num < 0) return alert("Monto inválido.");
+
+    var diff = num - val;
+    if (Math.abs(diff) > 0.01) {
+      var txObj = {
+        id: String(Date.now()),
+        type: diff > 0 ? 'ingreso' : 'gasto',
+        desc: 'Sinceramiento (' + names[key] + ')',
+        amount: Math.abs(diff),
+        category: 'Ajuste de Saldo',
+        account: names[key],
+        isAnt: false,
+        timestamp: Date.now(),
+        date: new Date().toISOString()
+      };
+      state.txs.unshift(txObj);
+      pushSingleTx(txObj);
+    }
 
     state.accounts[key] = num;
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
@@ -514,40 +522,23 @@
       envBox.innerHTML = '';
 
       var limitKeys = Object.keys(state.limits);
-      if (limitKeys.length === 0) {
-        envBox.innerHTML = '<span style="font-size:0.75rem; color:var(--muted)">Cargando topes de la hoja...</span>';
-      } else {
-        limitKeys.forEach(function(cat) {
-          var limit = state.limits[cat] || 0;
-          if (limit <= 0) return;
-          var spent = catExpensesCycle[cat] || 0;
-          var remain = Math.max(0, limit - spent);
-          committedEnvelopes += remain;
+      limitKeys.forEach(function(cat) {
+        var limit = state.limits[cat] || 0;
+        if (limit <= 0) return;
+        var spent = catExpensesCycle[cat] || 0;
+        var remain = Math.max(0, limit - spent);
+        committedEnvelopes += remain;
 
-          var pct = limit > 0 ? Math.round((spent / limit) * 100) : 0;
-          var barColor = pct > 100 ? 'var(--danger)' : (pct >= 85 ? 'var(--warning)' : 'var(--success)');
+        var pct = limit > 0 ? Math.round((spent / limit) * 100) : 0;
+        var barColor = pct > 100 ? 'var(--danger)' : (pct >= 85 ? 'var(--warning)' : 'var(--success)');
 
-          var row = document.createElement('div');
-          row.style.marginBottom = '6px';
-          row.innerHTML = '<div style="display:flex; justify-content:space-between; font-size:0.75rem;">' +
-            '<span>' + cat + ' (Gastado: ' + fmt(spent) + ')</span>' +
-            '<span>Tope: ' + fmt(limit) + ' (' + pct + '%)</span>' +
-            '</div>' +
-            '<div class="progress-bg"><div class="progress-fill" style="width:' + Math.min(100, pct) + '%; background:' + barColor + '"></div></div>';
-          envBox.appendChild(row);
-        });
-      }
-
-      var goalsBox = document.getElementById('goals-list');
-      goalsBox.innerHTML = '';
-      (state.goals || []).forEach(function(g) {
-        var gPct = g.target > 0 ? Math.min(100, Math.round((g.current / g.target) * 100)) : 0;
-        var grow = document.createElement('div');
-        grow.style.marginBottom = '6px';
-        grow.innerHTML = '<div style="display:flex; justify-content:space-between; font-size:0.75rem;">' +
-          '<strong>' + g.name + ' (' + fmt(g.current) + ' / ' + fmt(g.target) + ')</strong><span>' + gPct + '%</span></div>' +
-          '<div class="progress-bg"><div class="progress-fill" style="width:' + gPct + '%; background:var(--accent)"></div></div>';
-        goalsBox.appendChild(grow);
+        var row = document.createElement('div');
+        row.style.marginBottom = '6px';
+        row.innerHTML = '<div style="display:flex; justify-content:space-between; font-size:0.75rem;">' +
+          '<span>' + cat + ' (Gastado: ' + fmt(spent) + ')</span>' +
+          '<span>Tope: ' + fmt(limit) + ' (' + pct + '%)</span></div>' +
+          '<div class="progress-bg"><div class="progress-fill" style="width:' + Math.min(100, pct) + '%; background:' + barColor + '"></div></div>';
+        envBox.appendChild(row);
       });
 
       var realFree = liquid - committedEnvelopes;
@@ -640,7 +631,25 @@
     }
   }
 
-  // Carga inicial
+  function loadPlanSliders() {
+    var box = document.getElementById('sliders-box');
+    if (!box) return;
+    box.innerHTML = '';
+    Object.keys(state.limits).forEach(function(c) {
+      var row = document.createElement('div');
+      row.style.marginBottom = '6px';
+      row.innerHTML = '<div style="display:flex; justify-content:space-between; font-size:0.75rem;"><strong>' + c + '</strong><span id="sl-val-' + c + '">' + fmt(state.limits[c]) + '</span></div>' +
+        '<input type="range" min="0" max="250" step="5" value="' + state.limits[c] + '" oninput="document.getElementById(\'sl-val-' + c + '\').textContent = fmt(this.value); state.limits[\'' + c + '\'] = parseFloat(this.value);">';
+      box.appendChild(row);
+    });
+  }
+
+  function saveLimits() {
+    localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
+    alert("Topes guardados.");
+    switchTab('dash', document.querySelectorAll('.nav-btn')[0]);
+  }
+
   render();
   fetchCloudData();
 </script>
