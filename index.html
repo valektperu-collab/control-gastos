@@ -176,11 +176,11 @@
     <div class="card" id="tx-history"></div>
   </div>
 
-  <!-- TAB 4: PLANIFICADOR (COMPLETO) -->
+  <!-- TAB 4: PLANIFICADOR (COMPLETO CON PROVISIONES) -->
   <div id="tab-plan" class="tab-content">
     <div class="header"><h1>Planificador, Sobres y Ahorro</h1></div>
     
-    <!-- SOBRES -->
+    <!-- 1. SOBRES -->
     <div class="card">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
         <span style="font-size:0.8rem; font-weight:700;">Topes de Sobres</span>
@@ -190,7 +190,37 @@
       <button class="btn-main" style="margin-top:8px;" onclick="saveLimits()">Guardar Topes</button>
     </div>
 
-    <!-- METAS Y AHORROS -->
+    <!-- 2. PROVISIONES MENSUALES (SERVICIOS: TELÉFONO, LUZ, INTERNET, AGUA, COCHERA) -->
+    <div class="card">
+      <span style="font-size:0.8rem; font-weight:700; margin-bottom:8px; display:block;">Provisiones Mensuales (Luz, Teléfono, Internet, Cochera)</span>
+      <div id="provs-list"></div>
+      <div style="border-top:1px solid var(--border); padding-top:8px; margin-top:8px;">
+        <label>Nombre del Servicio</label>
+        <input type="text" id="new-prov-name" placeholder="Ej. Teléfono, Recibo de Luz, Internet">
+        <div class="grid-2">
+          <div><label>Monto Mensual (S/)</label><input type="number" id="new-prov-amt" placeholder="Ej. 40.00"></div>
+          <div><label>Día de Vencimiento</label><input type="number" id="new-prov-day" placeholder="Ej. 10"></div>
+        </div>
+        <button class="btn-main" onclick="addProvision()">+ Guardar Provisión</button>
+      </div>
+    </div>
+
+    <!-- 3. COMPROMISOS Y DEUDAS FIJAS -->
+    <div class="card">
+      <span style="font-size:0.8rem; font-weight:700; margin-bottom:8px; display:block;">Compromisos y Deudas Fijas</span>
+      <div id="debts-list"></div>
+      <div style="border-top:1px solid var(--border); padding-top:8px; margin-top:8px;">
+        <label>Concepto</label>
+        <input type="text" id="new-debt-name" placeholder="Ej. Deuda Massiel">
+        <div class="grid-2">
+          <div><label>Monto (S/)</label><input type="number" id="new-debt-amt" placeholder="Ej. 30.00"></div>
+          <div><label>Día Pago</label><input type="number" id="new-debt-day" placeholder="Ej. 13"></div>
+        </div>
+        <button class="btn-main" onclick="addDebt()">+ Guardar Compromiso</button>
+      </div>
+    </div>
+
+    <!-- 4. METAS Y AHORROS -->
     <div class="card">
       <span style="font-size:0.8rem; font-weight:700; margin-bottom:8px; display:block;">Metas de Ahorro</span>
       <div id="goals-list-plan"></div>
@@ -200,21 +230,6 @@
         <label>Monto Objetivo (S/)</label>
         <input type="number" id="new-goal-target" placeholder="Ej. 500.00">
         <button class="btn-main" onclick="addGoal()">+ Crear Meta</button>
-      </div>
-    </div>
-
-    <!-- PROVISIONES Y DEUDAS -->
-    <div class="card">
-      <span style="font-size:0.8rem; font-weight:700; margin-bottom:8px; display:block;">Compromisos y Deudas Fijas</span>
-      <div id="debts-list"></div>
-      <div style="border-top:1px solid var(--border); padding-top:8px; margin-top:8px;">
-        <label>Concepto</label>
-        <input type="text" id="new-debt-name" placeholder="Ej. Deuda Massiel, Teléfono">
-        <div class="grid-2">
-          <div><label>Monto (S/)</label><input type="number" id="new-debt-amt" placeholder="Ej. 60.00"></div>
-          <div><label>Día Pago</label><input type="number" id="new-debt-day" placeholder="Ej. 15"></div>
-        </div>
-        <button class="btn-main" onclick="addDebt()">+ Guardar Compromiso</button>
       </div>
     </div>
   </div>
@@ -238,10 +253,16 @@
     cfg: { lastCycleStart: 0, income: 480.00 },
     accounts: { cash: 0.00, bank: 0.00, reserve: 0.00 },
     limits: { "Comida": 60, "Transporte": 60, "Comida hijos": 120, "Pasaje hijo": 80, "Aseo": 20, "Margen Libre": 10 },
-    goals: [],
+    provisions: [
+      { id: 1, name: "Teléfono", amount: 40.00, dueDay: 10, saved: 10.00 },
+      { id: 2, name: "Cochera", amount: 150.00, dueDay: 28, saved: 0.00 },
+      { id: 3, name: "Luz / Internet", amount: 80.00, dueDay: 20, saved: 0.00 }
+    ],
     debts: [
-      { id: 1, name: "Deuda Massiel", amount: 30.00, dueDay: 13 },
-      { id: 2, name: "Pago teléfono", amount: 30.00, dueDay: 9 }
+      { id: 1, name: "Deuda Massiel", amount: 30.00, dueDay: 13 }
+    ],
+    goals: [
+      { id: 1, name: "Ahorro Hijo", target: 500.00, current: 0.00 }
     ],
     txs: []
   };
@@ -274,12 +295,10 @@
       });
   }
 
-  // Calcula exactamente los saldos de Efectivo, Banco y Reserva de las transacciones
   function computeAccountsFromTxs() {
     var c = 0, b = 0, r = 0;
     var latestCycleStart = 0;
 
-    // Detecta automáticamente el último ciclo iniciado
     state.txs.forEach(function(t) {
       if (t.type === 'ingreso' && (t.desc || '').includes('Sueldo Ciclo')) {
         var ts = t.timestamp || new Date(t.date).getTime() || 0;
@@ -305,7 +324,7 @@
       } else if (t.type === 'gasto') {
         if (acc.includes('reserva') || acc.includes('reserve')) r -= amt;
         else if (acc.includes('banco') || acc.includes('bank') || acc.includes('yape')) b -= amt;
-        else c -= amt;
+        else c += amt;
       }
     });
 
@@ -328,7 +347,6 @@
     });
   }
 
-  // Borrado con GET y POST para asegurar eliminación en Drive
   function deleteTx(id) {
     if (!confirm("¿Eliminar este registro permanentemente de Google Drive y de todos los dispositivos?")) return;
     
@@ -337,9 +355,7 @@
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
     render();
 
-    // 1. Envío GET
     fetch(DRIVE_API_URL + "?action=delete&id=" + encodeURIComponent(id), { mode: 'no-cors' });
-    // 2. Envío POST por compatibilidad
     fetch(DRIVE_API_URL, {
       method: 'POST',
       mode: 'no-cors',
@@ -697,6 +713,7 @@
   }
 
   function loadPlanSliders() {
+    // 1. Sobres
     var box = document.getElementById('sliders-box');
     if (box) {
       box.innerHTML = '';
@@ -709,19 +726,39 @@
       });
     }
 
-    var gPlan = document.getElementById('goals-list-plan');
-    if (gPlan) {
-      gPlan.innerHTML = '';
-      (state.goals || []).forEach(function(g) {
-        gPlan.innerHTML += '<div style="display:flex; justify-content:space-between; font-size:0.75rem; padding:4px 0;"><span>' + g.name + ' (Meta: ' + fmt(g.target) + ')</span><div><strong>Llevas: ' + fmt(g.current || 0) + '</strong> <button class="btn-link" style="color:var(--danger)" onclick="deleteGoal(\'' + g.id + '\')">[X]</button></div></div>';
+    // 2. Provisiones Mensuales
+    var provsBox = document.getElementById('provs-list');
+    if (provsBox) {
+      provsBox.innerHTML = '';
+      (state.provisions || []).forEach(function(p) {
+        provsBox.innerHTML += '<div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; padding:4px 0; border-bottom:1px solid var(--border);">' +
+          '<div><strong>' + p.name + '</strong> (Vence día ' + p.dueDay + ')<br><span style="color:var(--muted); font-size:0.68rem;">S/ ' + (p.amount/4).toFixed(2) + ' / sem</span></div>' +
+          '<div><strong style="color:var(--purple);">' + fmt(p.amount) + ' / mes</strong> <button class="btn-link" style="color:var(--danger); font-weight:bold; margin-left:6px;" onclick="deleteProv(' + p.id + ')">[X]</button></div>' +
+          '</div>';
       });
     }
 
+    // 3. Compromisos / Deudas
     var debtsBox = document.getElementById('debts-list');
     if (debtsBox) {
       debtsBox.innerHTML = '';
       (state.debts || []).forEach(function(d) {
-        debtsBox.innerHTML += '<div style="display:flex; justify-content:space-between; font-size:0.75rem; padding:4px 0;"><span>' + d.name + ' (Día ' + d.dueDay + ')</span><div><strong>' + fmt(d.amount) + '</strong> <button class="btn-link" style="color:var(--danger)" onclick="deleteDebt(' + d.id + ')">[X]</button></div></div>';
+        debtsBox.innerHTML += '<div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; padding:4px 0; border-bottom:1px solid var(--border);">' +
+          '<div><strong>' + d.name + '</strong> (Día ' + d.dueDay + ')</div>' +
+          '<div><strong>' + fmt(d.amount) + '</strong> <button class="btn-link" style="color:var(--danger); font-weight:bold; margin-left:6px;" onclick="deleteDebt(' + d.id + ')">[X]</button></div>' +
+          '</div>';
+      });
+    }
+
+    // 4. Metas
+    var gPlan = document.getElementById('goals-list-plan');
+    if (gPlan) {
+      gPlan.innerHTML = '';
+      (state.goals || []).forEach(function(g) {
+        gPlan.innerHTML += '<div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; padding:4px 0; border-bottom:1px solid var(--border);">' +
+          '<div><strong>' + g.name + '</strong> (Meta: ' + fmt(g.target) + ')</div>' +
+          '<div><strong>Llevas: ' + fmt(g.current || 0) + '</strong> <button class="btn-link" style="color:var(--danger); font-weight:bold; margin-left:6px;" onclick="deleteGoal(\'' + g.id + '\')">[X]</button></div>' +
+          '</div>';
       });
     }
   }
@@ -736,20 +773,22 @@
     render();
   }
 
-  function addGoal() {
-    var name = document.getElementById('new-goal-name').value.trim();
-    var target = parseFloat(document.getElementById('new-goal-target').value);
-    if (!name || isNaN(target) || target <= 0) return alert("Completa nombre y objetivo válido.");
-    state.goals.push({ id: String(Date.now()), name: name, target: target, current: 0.00 });
-    document.getElementById('new-goal-name').value = '';
-    document.getElementById('new-goal-target').value = '';
+  function addProvision() {
+    var name = document.getElementById('new-prov-name').value.trim();
+    var amt = parseFloat(document.getElementById('new-prov-amt').value);
+    var day = parseInt(document.getElementById('new-prov-day').value) || 10;
+    if (!name || isNaN(amt) || amt <= 0) return alert("Completa nombre y monto válido.");
+    if (!state.provisions) state.provisions = [];
+    state.provisions.push({ id: Date.now(), name: name, amount: amt, dueDay: day, saved: 0.00 });
+    document.getElementById('new-prov-name').value = '';
+    document.getElementById('new-prov-amt').value = '';
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
     loadPlanSliders();
   }
 
-  function deleteGoal(id) {
-    if (confirm("¿Eliminar esta meta?")) {
-      state.goals = state.goals.filter(function(x) { return String(x.id) !== String(id); });
+  function deleteProv(id) {
+    if (confirm("¿Eliminar esta provisión?")) {
+      state.provisions = state.provisions.filter(function(x) { return x.id != id; });
       localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
       loadPlanSliders();
     }
@@ -760,6 +799,7 @@
     var amt = parseFloat(document.getElementById('new-debt-amt').value);
     var day = parseInt(document.getElementById('new-debt-day').value) || 15;
     if (!name || isNaN(amt) || amt <= 0) return alert("Completa concepto y monto válido.");
+    if (!state.debts) state.debts = [];
     state.debts.push({ id: Date.now(), name: name, amount: amt, dueDay: day });
     document.getElementById('new-debt-name').value = '';
     document.getElementById('new-debt-amt').value = '';
@@ -769,7 +809,27 @@
 
   function deleteDebt(id) {
     if (confirm("¿Eliminar este compromiso?")) {
-      state.debts = state.debts.filter(function(x) { return x.id !== id; });
+      state.debts = state.debts.filter(function(x) { return x.id != id; });
+      localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
+      loadPlanSliders();
+    }
+  }
+
+  function addGoal() {
+    var name = document.getElementById('new-goal-name').value.trim();
+    var target = parseFloat(document.getElementById('new-goal-target').value);
+    if (!name || isNaN(target) || target <= 0) return alert("Completa nombre y objetivo válido.");
+    if (!state.goals) state.goals = [];
+    state.goals.push({ id: String(Date.now()), name: name, target: target, current: 0.00 });
+    document.getElementById('new-goal-name').value = '';
+    document.getElementById('new-goal-target').value = '';
+    localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
+    loadPlanSliders();
+  }
+
+  function deleteGoal(id) {
+    if (confirm("¿Eliminar esta meta?")) {
+      state.goals = state.goals.filter(function(x) { return String(x.id) !== String(id); });
       localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
       loadPlanSliders();
     }
