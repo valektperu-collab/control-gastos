@@ -184,7 +184,7 @@
     </div>
   </div>
 
-  <!-- TAB 2: REGISTRO (CON CAMPO FECHA EDITABLE) -->
+  <!-- TAB 2: REGISTRO (CON CAMPO FECHA EDITABLE Y CATEGORÍAS ACTIVAS) -->
   <div id="tab-add" class="tab-content">
     <div class="header"><h1>Registrar Movimiento</h1></div>
     <div class="card">
@@ -217,7 +217,7 @@
       <input type="number" id="tx-amount" step="0.01" placeholder="0.00">
 
       <div id="grp-cat">
-        <label>Sobre / Categoría</label>
+        <label>Sobre / Categoría (Solo Activas)</label>
         <select id="tx-cat"></select>
         <div style="display:flex; align-items:center; gap:6px; margin-bottom:10px;">
           <input type="checkbox" id="tx-ant" style="width:auto; margin:0;">
@@ -243,7 +243,7 @@
     </div>
   </div>
 
-  <!-- TAB 4: PLANIFICADOR (CON EDICIÓN Y ELIMINACIÓN DE CATEGORÍAS) -->
+  <!-- TAB 4: PLANIFICADOR (CONTROL TOTAL DE SOBRES) -->
   <div id="tab-plan" class="tab-content">
     <div class="header"><h1>Planificador, Sobres y Ahorro</h1></div>
     
@@ -318,16 +318,25 @@
 
 <script>
   var DRIVE_API_URL = "https://script.google.com/macros/s/AKfycbw2KxHq4aC_xk72pXDMlAF5c7gGIMrNLEZnP6Y9Q5TYaLkQJmksx4QZ-RivPsNNeB8/exec";
-  var APP_VERSION = "v3.9_date_field";
+  var APP_VERSION = "v4.0_active_envelopes";
   var isPrivacy = false;
   var myChart = null;
   var chartFilter = 'ciclo';
   var histFilter = 'hoy';
 
+  // Configuración con Pasaje Massiel y Pasaje Kalid ya integrados
   var state = {
     cfg: { lastCycleStart: 0, income: 480.00 },
     accounts: { cash: 15.00, bank: 120.00, reserve: 210.00 },
-    limits: { "Comida": 60, "Transporte": 60, "Comida hijos": 130, "Pasaje hijo": 90, "Aseo": 20, "Margen Libre": 10 },
+    limits: { 
+      "Comida": 60, 
+      "Transporte": 60, 
+      "Comida hijos": 130, 
+      "Pasaje Massiel": 70, 
+      "Pasaje Kalid": 20, 
+      "Aseo": 20, 
+      "Margen Libre": 10 
+    },
     provisions: [
       { id: 1, name: "Cochera", amount: 250.00, dueDate: "2026-10-28", isPaid: true, paidAt: Date.now() }
     ],
@@ -360,8 +369,7 @@
   function initDateField() {
     var dInput = document.getElementById('tx-date');
     if (dInput && !dInput.value) {
-      var today = new Date().toISOString().slice(0, 10);
-      dInput.value = today;
+      dInput.value = new Date().toISOString().slice(0, 10);
     }
   }
 
@@ -591,18 +599,28 @@
     document.getElementById('grp-cat').style.display = (t === 'gasto') ? 'block' : 'none';
   }
 
+  // REGLA CLAVE: Solo categorías activas que tengan presupuesto asignado > 0
   function populateCatSelect() {
     var sel = document.getElementById('tx-cat');
     if (!sel) return;
     sel.innerHTML = '';
-    var cats = Object.keys(state.limits);
-    if (cats.length === 0) cats = ["Transporte", "Comida", "Comida hijos", "Pasaje hijo", "Aseo", "Margen Libre"];
-    cats.forEach(function(c) {
-      var opt = document.createElement('option'); opt.value = c; opt.textContent = c; sel.appendChild(opt);
+    
+    var activeCats = Object.keys(state.limits).filter(function(c) {
+      return (state.limits[c] || 0) > 0;
+    });
+
+    if (activeCats.length === 0) {
+      activeCats = ["Comida", "Transporte", "Margen Libre"];
+    }
+
+    activeCats.forEach(function(c) {
+      var opt = document.createElement('option');
+      opt.value = c;
+      opt.textContent = c;
+      sel.appendChild(opt);
     });
   }
 
-  // SUBMIT CON SOPORTE COMPLETO PARA EL CAMPO FECHA
   function submitTx() {
     var type = document.getElementById('tx-type').value;
     var desc = document.getElementById('tx-desc').value.trim();
@@ -612,7 +630,6 @@
     if (!desc || isNaN(amt) || amt <= 0) return alert("Completa descripción y monto válidos.");
     if (!dateVal) dateVal = new Date().toISOString().slice(0, 10);
 
-    // Calcular marca de tiempo a partir de la fecha seleccionada
     var dateParts = dateVal.split('-');
     var selectedDate = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]), 12, 0, 0);
     var calculatedTimestamp = selectedDate.getTime();
