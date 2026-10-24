@@ -431,14 +431,21 @@
   function deleteTx(id) {
     if (!confirm("¿Eliminar este registro permanentemente de Google Drive y de todos los dispositivos?")) return;
     
+    // 1. Quitarlo de la pantalla y de la memoria de inmediato
     state.txs = state.txs.filter(function(t) { return String(t.id).trim() !== String(id).trim(); });
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
     render();
 
-    var beacon = new Image();
-    beacon.src = DRIVE_API_URL + "?action=delete&deleteId=" + encodeURIComponent(id) + "&t=" + Date.now();
+    // 2. Envío directo infalible a Google Apps Script
+    fetch(DRIVE_API_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'delete', deleteId: String(id).trim() })
+    }).catch(function(err) {
+      console.error("Error al enviar borrado:", err);
+    });
   }
-
   function fmt(val) {
     return isPrivacy ? 'S/ ••••' : 'S/ ' + Number(val || 0).toFixed(2);
   }
