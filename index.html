@@ -248,7 +248,7 @@
     </div>
   </div>
 
-  <!-- TAB 4: PLANIFICADOR -->
+  <!-- TAB 4: PLANIFICADOR (CLOUD-FIRST) -->
   <div id="tab-plan" class="tab-content">
     <div class="header"><h1>Planificador, Sobres y Ahorro</h1></div>
     
@@ -258,7 +258,7 @@
         <button class="btn-link" onclick="promptAddCategory()">+ Categoría</button>
       </div>
       <div id="sliders-box"></div>
-      <button class="btn-main" style="margin-top:8px;" onclick="saveLimits()">Guardar Topes</button>
+      <button class="btn-main" style="margin-top:8px;" onclick="saveLimits()">Guardar Topes en la Nube</button>
     </div>
 
     <div class="card">
@@ -340,16 +340,14 @@
       "Margen Libre": 10 
     },
     provisions: [
-      { id: 101, name: "Cochera", amount: 150.00, dueDate: "2026-10-15", isPaid: false }
+      { id: 'prov_cochera', name: "Cochera", amount: 150.00, dueDate: "2026-10-15", isPaid: false }
     ],
     debts: [],
-    goals: [
-      { id: 1, name: "Ahorro Hijo", target: 500.00, current: 0.00 }
-    ],
+    goals: [],
     txs: []
   };
 
-  // Carga segura sin vaciar a ceros
+  // Carga local segura mientras responde Google Sheets
   var local = localStorage.getItem('ctrl_gastos_state');
   if (local) {
     try {
@@ -357,9 +355,10 @@
       if (parsed) {
         if (parsed.accounts) state.accounts = parsed.accounts;
         if (parsed.limits) state.limits = parsed.limits;
-        if (Array.isArray(parsed.provisions) && parsed.provisions.length > 0) state.provisions = parsed.provisions;
-        if (Array.isArray(parsed.debts)) state.debts = parsed.debts.filter(function(d){ return !d.name.includes("200"); });
-        if (Array.isArray(parsed.txs) && parsed.txs.length > 0) state.txs = parsed.txs;
+        if (Array.isArray(parsed.provisions)) state.provisions = parsed.provisions;
+        if (Array.isArray(parsed.debts)) state.debts = parsed.debts.filter(function(d){ return !String(d.name).includes("200"); });
+        if (Array.isArray(parsed.goals)) state.goals = parsed.goals;
+        if (Array.isArray(parsed.txs)) state.txs = parsed.txs;
       }
     } catch(e) {}
   }
@@ -376,6 +375,7 @@
     }
   }
 
+  // DESCARGA CENTRALIZADA DESDE GOOGLE SHEETS
   function fetchCloudData() {
     var badge = document.getElementById('sync-badge');
     if (badge) { badge.textContent = '☁ Sincronizando...'; badge.style.color = 'var(--warning)'; }
@@ -383,16 +383,42 @@
     fetch(DRIVE_API_URL, { redirect: "follow" })
       .then(function(res) { return res.json(); })
       .then(function(cloud) {
-        if (cloud && Array.isArray(cloud.txs) && cloud.txs.length > 0) {
-          state.txs = cloud.txs.filter(function(t) {
-            return t.category !== 'Ajuste de Saldo' && !(t.desc || '').includes('Sinceramiento');
-          });
+        if (cloud) {
+          if (Array.isArray(cloud.txs)) {
+            state.txs = cloud.txs.filter(function(t) {
+              return t.category !== 'Ajuste de Saldo' && !(t.desc || '').includes('Sinceramiento');
+            });
+            state.txs.sort(function(a, b) {
+              var timeA = a.timestamp || new Date(a.date).getTime() || 0;
+              var timeB = b.timestamp || new Date(b.date).getTime() || 0;
+              return timeB - timeA;
+            });
+          }
 
-          state.txs.sort(function(a, b) {
-            var timeA = a.timestamp || new Date(a.date).getTime() || 0;
-            var timeB = b.timestamp || new Date(b.date).getTime() || 0;
-            return timeB - timeA;
-          });
+          // Sincronizar Compromisos Fijos de Sheets
+          if (Array.isArray(cloud.debts)) {
+            var provs = [];
+            var realDebts = [];
+            cloud.debts.forEach(function(item) {
+              if (item.type === 'provision' || (item.name || '').toLowerCase().includes('cochera')) {
+                provs.push(item);
+              } else {
+                realDebts.push(item);
+              }
+            });
+            if (provs.length > 0) state.provisions = provs;
+            state.debts = realDebts;
+          }
+
+          // Sincronizar Topes de Sheets
+          if (cloud.limits && Object.keys(cloud.limits).length > 0) {
+            state.limits = cloud.limits;
+          }
+
+          // Sincronizar Metas de Sheets
+          if (Array.isArray(cloud.goals)) {
+            state.goals = cloud.goals;
+          }
 
           findLatestCycle();
           recalculateDynamicAccounts();
@@ -402,9 +428,24 @@
           if (badge) { badge.textContent = '☁ Sincronizado'; badge.style.color = 'var(--success)'; }
         }
       }).catch(function(err) {
-        console.warn("Offline:", err);
+        console.warn("Modo local/offline:", err);
         if (badge) { badge.textContent = '☁ Local'; badge.style.color = 'var(--muted)'; }
       });
+  }
+
+  // ENVÍO DE ACCIONES HACIA GOOGLE SHEETS
+  function postToSheets(payload) {
+    var badge = document.getElementById('sync-badge');
+    if (badge) { badge.textContent = '☁ Guardando...'; badge.style.color = 'var(--warning)'; }
+
+    fetch(DRIVE_API_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(payload)
+    }).then(function() {
+      if (badge) { badge.textContent = '☁ Sincronizado'; badge.style.color = 'var(--success)'; }
+    });
   }
 
   function recalculateDynamicAccounts() {
@@ -466,20 +507,6 @@
     state.debts = keptDebts;
   }
 
-  function pushSingleTx(tx) {
-    var badge = document.getElementById('sync-badge');
-    if (badge) { badge.textContent = '☁ Guardando...'; badge.style.color = 'var(--warning)'; }
-
-    fetch(DRIVE_API_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ newTx: tx })
-    }).then(function() {
-      if (badge) { badge.textContent = '☁ Sincronizado'; badge.style.color = 'var(--success)'; }
-    });
-  }
-
   function deleteTx(id) {
     if (!confirm("¿Eliminar este registro permanentemente de Google Drive y de todos los dispositivos?")) return;
     
@@ -502,21 +529,7 @@
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
     render();
 
-    var badge = document.getElementById('sync-badge');
-    if (badge) { badge.textContent = '☁ Borrando...'; badge.style.color = 'var(--danger)'; }
-
-    var form = document.getElementById('hidden_delete_form');
-    var inputId = document.getElementById('form_delete_id');
-    if (form && inputId) {
-      form.action = DRIVE_API_URL;
-      inputId.value = cleanId;
-      form.submit();
-    }
-
-    setTimeout(function() {
-      fetch(DRIVE_API_URL + "?action=delete&deleteId=" + encodeURIComponent(cleanId) + "&t=" + Date.now(), { mode: 'no-cors' });
-      if (badge) { badge.textContent = '☁ Sincronizado'; badge.style.color = 'var(--success)'; }
-    }, 1200);
+    postToSheets({ action: 'deleteTx', id: cleanId });
   }
 
   function fmt(val) {
@@ -576,7 +589,7 @@
     state.txs.unshift(txObj);
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
     render();
-    pushSingleTx(txObj);
+    postToSheets({ newTx: txObj });
     alert("¡Nuevo ciclo iniciado!");
   }
 
@@ -607,7 +620,7 @@
     state.txs.unshift(txObj);
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
     render();
-    pushSingleTx(txObj);
+    postToSheets({ newTx: txObj });
   }
 
   function toggleTxForm() {
@@ -761,7 +774,7 @@
     initDateField();
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
     render();
-    pushSingleTx(txObj);
+    postToSheets({ newTx: txObj });
     switchTab('dash', document.querySelectorAll('.nav-btn')[0]);
   }
 
@@ -993,7 +1006,7 @@
     state.txs.unshift(txObj);
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
     render();
-    pushSingleTx(txObj);
+    postToSheets({ newTx: txObj });
   }
 
   function payDebtCurrent() {
@@ -1026,7 +1039,7 @@
     state.txs.unshift(txObj);
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
     render();
-    pushSingleTx(txObj);
+    postToSheets({ newTx: txObj });
   }
 
   function render() {
@@ -1250,6 +1263,7 @@
     });
   }
 
+  // PLANIFICADOR CONECTADO DIRECTAMENTE A GOOGLE SHEETS
   function loadPlanSliders() {
     var box = document.getElementById('sliders-box');
     if (box) {
@@ -1278,7 +1292,7 @@
         var statusBadge = p.isPaid ? '<span class="val-success" style="font-weight:bold;">[PAGADO]</span>' : '<span class="val-warning">[PENDIENTE]</span>';
         provsBox.innerHTML += '<div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; padding:4px 0; border-bottom:1px solid var(--border);">' +
           '<div><strong>' + p.name + '</strong> (' + (p.dueDate || 'Mensual') + ') ' + statusBadge + '<br><span style="color:var(--muted); font-size:0.68rem;">S/ ' + (p.amount/4).toFixed(2) + ' / sem</span></div>' +
-          '<div><strong style="color:var(--purple);">' + fmt(p.amount) + ' / mes</strong> <button class="btn-link" style="color:var(--danger); font-weight:bold; margin-left:6px;" onclick="deleteProv(' + p.id + ')">[X]</button></div>' +
+          '<div><strong style="color:var(--purple);">' + fmt(p.amount) + ' / mes</strong> <button class="btn-link" style="color:var(--danger); font-weight:bold; margin-left:6px;" onclick="deleteProv(\'' + p.id + '\')">[X]</button></div>' +
           '</div>';
       });
     }
@@ -1290,7 +1304,7 @@
         var debtBadge = d.isPaid ? '<span class="val-success" style="font-weight:bold;">[PAGADO]</span>' : '<span class="val-warning">[PENDIENTE]</span>';
         debtsBox.innerHTML += '<div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; padding:4px 0; border-bottom:1px solid var(--border);">' +
           '<div><strong>' + d.name + '</strong> (' + (d.dueDate || 'Mensual') + ') ' + debtBadge + '<br><span style="color:var(--muted); font-size:0.68rem;">S/ ' + (d.amount/4).toFixed(2) + ' / sem</span></div>' +
-          '<div><strong>' + fmt(d.amount) + '</strong> <button class="btn-link" style="color:var(--danger); font-weight:bold; margin-left:6px;" onclick="deleteDebt(' + d.id + ')">[X]</button></div>' +
+          '<div><strong>' + fmt(d.amount) + '</strong> <button class="btn-link" style="color:var(--danger); font-weight:bold; margin-left:6px;" onclick="deleteDebt(\'' + d.id + '\')">[X]</button></div>' +
           '</div>';
       });
     }
@@ -1320,6 +1334,7 @@
     loadPlanSliders();
     populateCatSelect();
     render();
+    postToSheets({ action: 'saveLimits', limits: state.limits });
   }
 
   function deleteCategory(catName) {
@@ -1329,6 +1344,7 @@
     loadPlanSliders();
     populateCatSelect();
     render();
+    postToSheets({ action: 'saveLimits', limits: state.limits });
   }
 
   function promptAddCategory() {
@@ -1340,6 +1356,7 @@
     loadPlanSliders();
     populateCatSelect();
     render();
+    postToSheets({ action: 'saveLimits', limits: state.limits });
   }
 
   function addProvision() {
@@ -1347,21 +1364,26 @@
     var amt = parseFloat(document.getElementById('new-prov-amt').value);
     var dateVal = document.getElementById('new-prov-date').value;
     if (!name || isNaN(amt) || amt <= 0) return alert("Completa nombre y monto válido.");
+    
+    var provObj = { id: 'prov_' + Date.now(), name: name, amount: amt, dueDate: dateVal, isPaid: false, type: 'provision' };
     if (!state.provisions) state.provisions = [];
-    state.provisions.push({ id: Date.now(), name: name, amount: amt, dueDate: dateVal, isPaid: false });
+    state.provisions.push(provObj);
+    
     document.getElementById('new-prov-name').value = '';
     document.getElementById('new-prov-amt').value = '';
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
     loadPlanSliders();
     render();
+    postToSheets({ action: 'saveDebt', debt: provObj });
   }
 
   function deleteProv(id) {
-    if (confirm("¿Eliminar esta provisión permanentemente?")) {
-      state.provisions = state.provisions.filter(function(x) { return x.id != id; });
+    if (confirm("¿Eliminar esta provisión permanentemente de todos los dispositivos?")) {
+      state.provisions = state.provisions.filter(function(x) { return String(x.id) !== String(id); });
       localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
       loadPlanSliders();
       render();
+      postToSheets({ action: 'deleteDebt', id: id });
     }
   }
 
@@ -1371,21 +1393,26 @@
     var dateVal = document.getElementById('new-debt-date').value;
     var isSingle = document.getElementById('new-debt-single').checked;
     if (!name || isNaN(amt) || amt <= 0) return alert("Completa concepto y monto válido.");
+    
+    var debtObj = { id: 'debt_' + Date.now(), name: name, amount: amt, dueDate: dateVal, isPaid: false, isSingle: isSingle, type: 'deuda' };
     if (!state.debts) state.debts = [];
-    state.debts.push({ id: Date.now(), name: name, amount: amt, dueDate: dateVal, isPaid: false, isSingle: isSingle });
+    state.debts.push(debtObj);
+    
     document.getElementById('new-debt-name').value = '';
     document.getElementById('new-debt-amt').value = '';
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
     loadPlanSliders();
     render();
+    postToSheets({ action: 'saveDebt', debt: debtObj });
   }
 
   function deleteDebt(id) {
-    if (confirm("¿Eliminar este compromiso permanentemente?")) {
-      state.debts = state.debts.filter(function(x) { return x.id != id; });
+    if (confirm("¿Eliminar este compromiso permanentemente de todos los dispositivos?")) {
+      state.debts = state.debts.filter(function(x) { return String(x.id) !== String(id); });
       localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
       loadPlanSliders();
       render();
+      postToSheets({ action: 'deleteDebt', id: id });
     }
   }
 
@@ -1393,25 +1420,31 @@
     var name = document.getElementById('new-goal-name').value.trim();
     var target = parseFloat(document.getElementById('new-goal-target').value);
     if (!name || isNaN(target) || target <= 0) return alert("Completa nombre y objetivo válido.");
+    
+    var goalObj = { id: 'goal_' + Date.now(), name: name, target: target, current: 0.00 };
     if (!state.goals) state.goals = [];
-    state.goals.push({ id: String(Date.now()), name: name, target: target, current: 0.00 });
+    state.goals.push(goalObj);
+    
     document.getElementById('new-goal-name').value = '';
     document.getElementById('new-goal-target').value = '';
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
     loadPlanSliders();
+    postToSheets({ action: 'saveGoal', goal: goalObj });
   }
 
   function deleteGoal(id) {
-    if (confirm("¿Eliminar esta meta?")) {
+    if (confirm("¿Eliminar esta meta permanentemente de todos los dispositivos?")) {
       state.goals = state.goals.filter(function(x) { return String(x.id) !== String(id); });
       localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
       loadPlanSliders();
+      postToSheets({ action: 'deleteGoal', id: id });
     }
   }
 
   function saveLimits() {
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
-    alert("Topes guardados con éxito.");
+    postToSheets({ action: 'saveLimits', limits: state.limits });
+    alert("Topes guardados y sincronizados con Google Sheets.");
     switchTab('dash', document.querySelectorAll('.nav-btn')[0]);
   }
 
