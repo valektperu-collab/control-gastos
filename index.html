@@ -65,7 +65,6 @@
 <div class="container">
   <!-- TAB 1: PANEL -->
   <div id="tab-dash" class="tab-content active">
-    <!-- BANNER SEMÁFORO INTELIGENTE -->
     <div id="traffic-banner" class="traffic-banner traffic-green" onclick="rotateTrafficBanner()">
       <span id="banner-text">🟢 Todo al día y cubierto por ahora</span>
       <span id="banner-dots" style="font-size: 0.65rem; color: var(--muted);">1/1 ↻</span>
@@ -75,7 +74,7 @@
       <h1>Control de Gastos Pro</h1>
       <div style="display:flex; align-items:center; gap:5px;">
         <span id="sync-badge" class="btn-pill" style="color:var(--success); border-color:rgba(16,185,129,0.3)">☁ Sincronizado</span>
-        <button class="btn-pill" id="btn-privacy" onclick="togglePrivacy()">Ver</button>
+        <button class="btn-pill" id="btn-privacy" onclick="togglePrivacy()">Ocultar</button>
         <button class="btn-pill" style="color:var(--accent)" onclick="confirmNewCycle()">+ Ciclo</button>
       </div>
     </div>
@@ -90,15 +89,15 @@
     <!-- 1. HERO CARD -->
     <div class="card hero-card" id="hero-card">
       <div class="balance-title">Margen Libre Real (Ciclo Semanal)</div>
-      <div id="disp-free" class="balance-amount val-success">S/ ••••</div>
+      <div id="disp-free" class="balance-amount val-success">S/ 0.00</div>
       <div class="grid-2" style="margin-top:8px;">
-        <div><div class="stat-label">Bolsillo Real (Ef + Bco)</div><div id="disp-liquid" class="stat-val">S/ ••••</div></div>
-        <div><div class="stat-label">Comprometido (Sobres + Prov)</div><div id="disp-committed" class="stat-val val-warning">S/ ••••</div></div>
+        <div><div class="stat-label">Bolsillo Real (Ef + Bco)</div><div id="disp-liquid" class="stat-val">S/ 0.00</div></div>
+        <div><div class="stat-label">Comprometido (Sobres + Prov)</div><div id="disp-committed" class="stat-val val-warning">S/ 0.00</div></div>
       </div>
       <div class="summary-line">
-        <span>Ingresos Sem: <strong id="sum-inc">S/ ••••</strong></span>
-        <span>Gastos Sem: <strong id="sum-exp" class="val-danger">S/ ••••</strong></span>
-        <span>Reserva: <strong id="sum-prov" class="val-accent">S/ ••••</strong></span>
+        <span>Ingresos Sem: <strong id="sum-inc">S/ 0.00</strong></span>
+        <span>Gastos Sem: <strong id="sum-exp" class="val-danger">S/ 0.00</strong></span>
+        <span>Reserva: <strong id="sum-prov" class="val-accent">S/ 0.00</strong></span>
       </div>
     </div>
 
@@ -111,17 +110,17 @@
       <div class="grid-3">
         <div class="account-box">
           <div class="stat-label">Efectivo</div>
-          <div id="acc-cash" class="account-balance">S/ ••••</div>
+          <div id="acc-cash" class="account-balance">S/ 0.00</div>
           <button class="btn-link" onclick="reconcile('cash')">Sincerar</button>
         </div>
         <div class="account-box">
           <div class="stat-label">Banco / Yape</div>
-          <div id="acc-bank" class="account-balance">S/ ••••</div>
+          <div id="acc-bank" class="account-balance">S/ 0.00</div>
           <button class="btn-link" onclick="reconcile('bank')">Sincerar</button>
         </div>
         <div class="account-box">
           <div class="stat-label">Reserva / Bono</div>
-          <div id="acc-reserve" class="account-balance val-accent">S/ ••••</div>
+          <div id="acc-reserve" class="account-balance val-accent">S/ 0.00</div>
           <button class="btn-link" onclick="reconcile('reserve')">Sincerar</button>
         </div>
       </div>
@@ -134,9 +133,9 @@
         <span id="disp-month-label" style="font-size:0.7rem; color:var(--muted);">Octubre</span>
       </div>
       <div class="grid-3" style="text-align:center;">
-        <div><div class="stat-label">Ingresos Mes</div><div id="month-inc" class="stat-val val-success">S/ ••••</div></div>
-        <div><div class="stat-label">Gastos Mes</div><div id="month-exp" class="stat-val val-danger">S/ ••••</div></div>
-        <div><div class="stat-label">Balance Neto</div><div id="month-net" class="stat-val">S/ ••••</div></div>
+        <div><div class="stat-label">Ingresos Mes</div><div id="month-inc" class="stat-val val-success">S/ 0.00</div></div>
+        <div><div class="stat-label">Gastos Mes</div><div id="month-exp" class="stat-val val-danger">S/ 0.00</div></div>
+        <div><div class="stat-label">Balance Neto</div><div id="month-net" class="stat-val">S/ 0.00</div></div>
       </div>
     </div>
 
@@ -184,7 +183,7 @@
     </div>
   </div>
 
-  <!-- TAB 2: REGISTRO (CON CAMPO FECHA Y FILTRO DE SOBRES ACTIVOS) -->
+  <!-- TAB 2: REGISTRO -->
   <div id="tab-add" class="tab-content">
     <div class="header"><h1>Registrar Movimiento</h1></div>
     <div class="card">
@@ -229,7 +228,7 @@
     </div>
   </div>
 
-  <!-- TAB 3: HISTORIAL (ORDENADO CRONOLÓGICAMENTE) -->
+  <!-- TAB 3: HISTORIAL -->
   <div id="tab-hist" class="tab-content">
     <div class="header"><h1>Historial de Movimientos</h1></div>
     <div class="card">
@@ -243,7 +242,7 @@
     </div>
   </div>
 
-  <!-- TAB 4: PLANIFICADOR (CONTROL TOTAL DE SOBRES) -->
+  <!-- TAB 4: PLANIFICADOR -->
   <div id="tab-plan" class="tab-content">
     <div class="header"><h1>Planificador, Sobres y Ahorro</h1></div>
     
@@ -318,13 +317,12 @@
 
 <script>
   var DRIVE_API_URL = "https://script.google.com/macros/s/AKfycbw2KxHq4aC_xk72pXDMlAF5c7gGIMrNLEZnP6Y9Q5TYaLkQJmksx4QZ-RivPsNNeB8/exec";
-  var APP_VERSION = "v4.1_restore_balances";
-  var isPrivacy = false;
+  var APP_VERSION = "v4.2_clean_privacy";
+  var isPrivacy = false; // Siempre visible por defecto
   var myChart = null;
   var chartFilter = 'ciclo';
   var histFilter = 'hoy';
 
-  // Configuración con Pasaje Massiel y Pasaje Kalid ya integrados
   var state = {
     cfg: { lastCycleStart: 0, income: 480.00 },
     accounts: { cash: 95.00, bank: 120.00, reserve: 210.00 },
@@ -477,7 +475,6 @@
     });
   }
 
-  // BORRADO CON REINTEGRO AUTOMÁTICO DEL DINERO AL BOLSILLO
   function deleteTx(id) {
     if (!confirm("¿Eliminar este registro permanentemente de Google Drive y de todos los dispositivos?")) return;
     
@@ -489,7 +486,6 @@
       var accRaw = (txToDelete.account || '').toLowerCase();
       var accKey = accRaw.includes('banco') || accRaw.includes('yape') ? 'bank' : (accRaw.includes('reserva') ? 'reserve' : 'cash');
       
-      // Devolver saldo a la cuenta real
       if (txToDelete.type === 'gasto') {
         state.accounts[accKey] += amt;
       } else if (txToDelete.type === 'ingreso') {
@@ -522,6 +518,7 @@
     return isPrivacy ? 'S/ ••••' : 'S/ ' + Number(val || 0).toFixed(2);
   }
 
+  // FUNCIÓN CORREGIDA: Alterna limpia y directamente
   function togglePrivacy() {
     isPrivacy = !isPrivacy;
     var btn = document.getElementById('btn-privacy');
@@ -1328,4 +1325,27 @@
 
   function deleteGoal(id) {
     if (confirm("¿Eliminar esta meta?")) {
-      state.goals = state.goals.filter(function(x) { return String(x.
+      state.goals = state.goals.filter(function(x) { return String(x.id) !== String(id); });
+      localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
+      loadPlanSliders();
+    }
+  }
+
+  function saveLimits() {
+    localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
+    alert("Topes guardados con éxito.");
+    switchTab('dash', document.querySelectorAll('.nav-btn')[0]);
+  }
+
+  setInterval(rotateTrafficBanner, 5000);
+  setInterval(function() {
+    nextProvCard();
+    nextDebtCard();
+  }, 5000);
+
+  initDateField();
+  render();
+  fetchCloudData();
+</script>
+</body>
+</html>
