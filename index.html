@@ -306,9 +306,16 @@
   <button class="nav-btn" onclick="switchTab('plan', this)">Planificador</button>
 </div>
 
+<!-- CANAL INVISIBLE PARA BORRADOS INFALIBLES SIN BLOQUEO CORS -->
+<iframe name="hidden_delete_frame" style="display:none; width:0; height:0; border:0;"></iframe>
+<form id="hidden_delete_form" method="POST" target="hidden_delete_frame" style="display:none;">
+  <input type="hidden" name="action" value="delete">
+  <input type="hidden" name="deleteId" id="form_delete_id" value="">
+</form>
+
 <script>
   var DRIVE_API_URL = "https://script.google.com/macros/s/AKfycbwBiFWVPJgq5NsKwtAVJmYhZvzGzGqeUImDAsQCCZFfNEiaG5HvU_rs3vf1IfYFBuU/exec";
-  var APP_VERSION = "v3.3_hist_filters";
+  var APP_VERSION = "v3.4_real_delete";
   var isPrivacy = false;
   var myChart = null;
   var chartFilter = 'ciclo';
@@ -437,11 +444,13 @@
     });
   }
 
-  // BORRADO PERMANENTE
+  // MÉTODO INFALIBLE DE BORRADO VÍA FORMULARIO OCULTO (SIN BLOQUEO CORS)
   function deleteTx(id) {
     if (!confirm("¿Eliminar este registro permanentemente de Google Drive y de todos los dispositivos?")) return;
     
     var cleanId = String(id).trim();
+    
+    // 1. Quitarlo de la pantalla de inmediato
     state.txs = state.txs.filter(function(t) { return String(t.id).trim() !== cleanId; });
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
     render();
@@ -449,19 +458,20 @@
     var badge = document.getElementById('sync-badge');
     if (badge) { badge.textContent = '☁ Borrando...'; badge.style.color = 'var(--danger)'; }
 
-    fetch(DRIVE_API_URL + "?action=delete&deleteId=" + encodeURIComponent(cleanId) + "&t=" + Date.now(), {
-      method: 'GET',
-      mode: 'no-cors'
-    }).then(function() {
+    // 2. Disparo por Formulario HTML Oculto (Los navegadores NUNCA lo bloquean)
+    var form = document.getElementById('hidden_delete_form');
+    var inputId = document.getElementById('form_delete_id');
+    if (form && inputId) {
+      form.action = DRIVE_API_URL;
+      inputId.value = cleanId;
+      form.submit();
+    }
+
+    // 3. Respaldo secundario por GET
+    setTimeout(function() {
+      fetch(DRIVE_API_URL + "?action=delete&deleteId=" + encodeURIComponent(cleanId) + "&t=" + Date.now(), { mode: 'no-cors' });
       if (badge) { badge.textContent = '☁ Sincronizado'; badge.style.color = 'var(--success)'; }
-    }).catch(function() {
-      fetch(DRIVE_API_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: 'delete', deleteId: cleanId })
-      });
-    });
+    }, 1200);
   }
 
   function fmt(val) {
