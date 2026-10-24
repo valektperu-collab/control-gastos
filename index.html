@@ -184,10 +184,13 @@
     </div>
   </div>
 
-  <!-- TAB 2: REGISTRO -->
+  <!-- TAB 2: REGISTRO (CON CAMPO FECHA EDITABLE) -->
   <div id="tab-add" class="tab-content">
     <div class="header"><h1>Registrar Movimiento</h1></div>
     <div class="card">
+      <label>Fecha de Operación</label>
+      <input type="date" id="tx-date">
+
       <label>Tipo de Operación</label>
       <select id="tx-type" onchange="toggleTxForm()">
         <option value="gasto">Gasto Habitual</option>
@@ -315,13 +318,12 @@
 
 <script>
   var DRIVE_API_URL = "https://script.google.com/macros/s/AKfycbw2KxHq4aC_xk72pXDMlAF5c7gGIMrNLEZnP6Y9Q5TYaLkQJmksx4QZ-RivPsNNeB8/exec";
-  var APP_VERSION = "v3.8_sort_categories";
+  var APP_VERSION = "v3.9_date_field";
   var isPrivacy = false;
   var myChart = null;
   var chartFilter = 'ciclo';
   var histFilter = 'hoy';
 
-  // Sobres estándar unificados (sin categorías duplicadas ni desactualizadas)
   var state = {
     cfg: { lastCycleStart: 0, income: 480.00 },
     accounts: { cash: 15.00, bank: 120.00, reserve: 210.00 },
@@ -355,6 +357,14 @@
   var provCardIdx = 0;
   var debtCardIdx = 0;
 
+  function initDateField() {
+    var dInput = document.getElementById('tx-date');
+    if (dInput && !dInput.value) {
+      var today = new Date().toISOString().slice(0, 10);
+      dInput.value = today;
+    }
+  }
+
   function fetchCloudData() {
     var badge = document.getElementById('sync-badge');
     if (badge) { badge.textContent = '☁ Sincronizando...'; badge.style.color = 'var(--warning)'; }
@@ -367,7 +377,6 @@
             return t.category !== 'Ajuste de Saldo' && !(t.desc || '').includes('Sinceramiento');
           });
 
-          // ORDENAMIENTO CRONOLÓGICO ESTRICTO: De más reciente a más antiguo
           state.txs.sort(function(a, b) {
             var timeA = a.timestamp || new Date(a.date).getTime() || 0;
             var timeB = b.timestamp || new Date(b.date).getTime() || 0;
@@ -502,7 +511,10 @@
     var target = document.getElementById('tab-' + id);
     if (target) target.classList.add('active');
     if (btn) btn.classList.add('active');
-    if (id === 'add') populateCatSelect();
+    if (id === 'add') {
+      populateCatSelect();
+      initDateField();
+    }
     if (id === 'plan') loadPlanSliders();
     if (id === 'dash' || id === 'hist') render();
   }
@@ -532,7 +544,7 @@
       account: target === 'cash' ? 'Efectivo' : 'Banco/Yape',
       isAnt: false,
       timestamp: now.getTime(),
-      date: now.toISOString()
+      date: now.toISOString().slice(0, 10)
     };
 
     state.txs.unshift(txObj);
@@ -563,7 +575,7 @@
       account: accKey === 'cash' ? 'Efectivo' : 'Banco/Yape',
       isAnt: !!isAnt,
       timestamp: now.getTime(),
-      date: now.toISOString()
+      date: now.toISOString().slice(0, 10)
     };
 
     state.txs.unshift(txObj);
@@ -590,13 +602,21 @@
     });
   }
 
+  // SUBMIT CON SOPORTE COMPLETO PARA EL CAMPO FECHA
   function submitTx() {
     var type = document.getElementById('tx-type').value;
     var desc = document.getElementById('tx-desc').value.trim();
     var amt = parseFloat(document.getElementById('tx-amount').value);
-    if (!desc || isNaN(amt) || amt <= 0) return alert("Completa descripción y monto válidos.");
+    var dateVal = document.getElementById('tx-date').value;
 
-    var now = new Date();
+    if (!desc || isNaN(amt) || amt <= 0) return alert("Completa descripción y monto válidos.");
+    if (!dateVal) dateVal = new Date().toISOString().slice(0, 10);
+
+    // Calcular marca de tiempo a partir de la fecha seleccionada
+    var dateParts = dateVal.split('-');
+    var selectedDate = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]), 12, 0, 0);
+    var calculatedTimestamp = selectedDate.getTime();
+
     var txObj = {
       id: String(Date.now()),
       type: type,
@@ -605,8 +625,8 @@
       category: 'Otros',
       account: 'Efectivo',
       isAnt: false,
-      timestamp: now.getTime(),
-      date: now.toISOString()
+      timestamp: calculatedTimestamp,
+      date: dateVal
     };
 
     if (type === 'transfer') {
@@ -630,9 +650,16 @@
       }
     }
 
-    state.txs.unshift(txObj);
+    state.txs.push(txObj);
+    state.txs.sort(function(a, b) {
+      var tA = a.timestamp || new Date(a.date).getTime() || 0;
+      var tB = b.timestamp || new Date(b.date).getTime() || 0;
+      return tB - tA;
+    });
+
     document.getElementById('tx-desc').value = '';
     document.getElementById('tx-amount').value = '';
+    initDateField();
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
     render();
     pushSingleTx(txObj);
@@ -853,7 +880,7 @@
       account: accKey === 'cash' ? 'Efectivo' : 'Banco/Yape',
       isAnt: false,
       timestamp: now.getTime(),
-      date: now.toISOString()
+      date: now.toISOString().slice(0, 10)
     };
 
     state.txs.unshift(txObj);
@@ -886,7 +913,7 @@
       account: accKey === 'cash' ? 'Efectivo' : 'Banco/Yape',
       isAnt: false,
       timestamp: now.getTime(),
-      date: now.toISOString()
+      date: now.toISOString().slice(0, 10)
     };
 
     state.txs.unshift(txObj);
@@ -1053,7 +1080,6 @@
     } catch(e) {}
   }
 
-  // HISTORIAL CRONOLÓGICO REAL
   function renderHistory() {
     var histBox = document.getElementById('tx-history');
     if (!histBox) return;
@@ -1064,7 +1090,6 @@
       return;
     }
 
-    // Ordenar de más nuevo a más antiguo
     var sorted = state.txs.slice().sort(function(a, b) {
       var tA = a.timestamp || new Date(a.date).getTime() || 0;
       var tB = b.timestamp || new Date(b.date).getTime() || 0;
@@ -1083,7 +1108,6 @@
         var d = new Date(tx.timestamp || tx.date);
         return d.getDate() === curDay && d.getMonth() === curMonth && d.getFullYear() === curYear;
       });
-      // Si hoy aún no hay gastos, muestra los últimos 5 para que la vista no quede en blanco
       if (filteredList.length === 0) {
         filteredList = sorted.slice(0, 5);
       }
@@ -1110,7 +1134,7 @@
       var sign = isGasto ? '-' : (tx.type === 'ingreso' ? '+' : '⇄');
       var col = isGasto ? 'var(--danger)' : (tx.type === 'ingreso' ? 'var(--success)' : 'var(--accent)');
 
-      item.innerHTML = '<div><strong>' + tx.desc + '</strong><br><span style="font-size:0.68rem; color:var(--muted)">' + (tx.date ? tx.date.slice(0, 10) : '') + ' · ' + (tx.category || '') + ' (' + (tx.account || '') + ')</span></div>' +
+      item.innerHTML = '<div><strong>' + tx.desc + '</strong><br><span style="font-size:0.68rem; color:var(--muted)">' + (tx.date ? String(tx.date).slice(0, 10) : '') + ' · ' + (tx.category || '') + ' (' + (tx.account || '') + ')</span></div>' +
         '<div style="display:flex; align-items:center; gap:8px;">' +
         '<span style="font-weight:800; color:' + col + '">' + sign + ' ' + fmt(tx.amount) + '</span>' +
         '<button class="btn-link" style="color:var(--danger); font-size:0.95rem; font-weight:900; padding:4px;" onclick="deleteTx(\'' + tx.id + '\')">✕</button>' +
@@ -1119,7 +1143,6 @@
     });
   }
 
-  // PLANIFICADOR: CON BOTONES PARA RENOMBRAR Y ELIMINAR CATEGORÍAS
   function loadPlanSliders() {
     var box = document.getElementById('sliders-box');
     if (box) {
@@ -1291,6 +1314,7 @@
     nextDebtCard();
   }, 5000);
 
+  initDateField();
   render();
   fetchCloudData();
 </script>
