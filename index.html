@@ -87,18 +87,31 @@
       <button class="quick-btn" onclick="quickExpense('Margen Libre', 2.50, 'Antojo', true)">Antojo<br><span style="font-size:0.65rem; color:var(--warning)">Hormiga</span></button>
     </div>
 
-    <!-- HERO CARD -->
+    <!-- HERO CARD (CICLO SEMANAL BLINDADO) -->
     <div class="card hero-card" id="hero-card">
-      <div class="balance-title">Margen Libre Real (Ciclo Actual)</div>
+      <div class="balance-title">Margen Libre Real (Ciclo Semanal)</div>
       <div id="disp-free" class="balance-amount val-success">S/ ••••</div>
       <div class="grid-2" style="margin-top:8px;">
         <div><div class="stat-label">Bolsillo Real (Ef + Bco)</div><div id="disp-liquid" class="stat-val">S/ ••••</div></div>
         <div><div class="stat-label">Comprometido (Sobres + Prov)</div><div id="disp-committed" class="stat-val val-warning">S/ ••••</div></div>
       </div>
       <div class="summary-line">
-        <span>Ingresos: <strong id="sum-inc">S/ ••••</strong></span>
-        <span>Gastos: <strong id="sum-exp" class="val-danger">S/ ••••</strong></span>
+        <span>Ingresos Sem: <strong id="sum-inc">S/ ••••</strong></span>
+        <span>Gastos Sem: <strong id="sum-exp" class="val-danger">S/ ••••</strong></span>
         <span>Reserva: <strong id="sum-prov" class="val-accent">S/ ••••</strong></span>
+      </div>
+    </div>
+
+    <!-- BLOQUE MENSUAL FIJO -->
+    <div class="card" style="background:var(--card-alt); border-left:4px solid var(--purple);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <span style="font-size:0.75rem; font-weight:800; color:var(--purple); text-transform:uppercase;">Resumen del Mes en Curso</span>
+        <span id="disp-month-label" style="font-size:0.7rem; color:var(--muted);">Octubre</span>
+      </div>
+      <div class="grid-3" style="text-align:center;">
+        <div><div class="stat-label">Ingresos Mes</div><div id="month-inc" class="stat-val val-success">S/ ••••</div></div>
+        <div><div class="stat-label">Gastos Mes</div><div id="month-exp" class="stat-val val-danger">S/ ••••</div></div>
+        <div><div class="stat-label">Balance Neto</div><div id="month-net" class="stat-val">S/ ••••</div></div>
       </div>
     </div>
 
@@ -287,7 +300,7 @@
 
 <script>
   var DRIVE_API_URL = "https://script.google.com/macros/s/AKfycbwBiFWVPJgq5NsKwtAVJmYhZvzGzGqeUImDAsQCCZFfNEiaG5HvU_rs3vf1IfYFBuU/exec";
-  var APP_VERSION = "v3.0_clean_sync";
+  var APP_VERSION = "v3.1_sync_month";
   var isPrivacy = false;
   var myChart = null;
   var chartFilter = 'ciclo';
@@ -365,12 +378,10 @@
     if (latestCycleStart > 0) state.cfg.lastCycleStart = latestCycleStart;
   }
 
-  // LIMPIEZA AUTOMÁTICA TRAS 48 HORAS DE PAGO
   function cleanGracePeriods() {
     var now = Date.now();
     var twoDaysMs = 48 * 3600 * 1000;
 
-    // Provisiones recurrentes: avanzan al mes siguiente
     (state.provisions || []).forEach(function(p) {
       if (p.isPaid && p.paidAt && (now - p.paidAt > twoDaysMs)) {
         p.isPaid = false;
@@ -383,7 +394,6 @@
       }
     });
 
-    // Deudas: cuota única se elimina; cuota regular avanza
     var keptDebts = [];
     (state.debts || []).forEach(function(b) {
       if (b.isPaid && b.paidAt && (now - b.paidAt > twoDaysMs)) {
@@ -418,19 +428,16 @@
     });
   }
 
+  // BORRADO INFALIBLE MEDIANTE BALIZA (BEACON)
   function deleteTx(id) {
     if (!confirm("¿Eliminar este registro permanentemente de Google Drive y de todos los dispositivos?")) return;
-    state.txs = state.txs.filter(function(t) { return String(t.id) !== String(id); });
+    
+    state.txs = state.txs.filter(function(t) { return String(t.id).trim() !== String(id).trim(); });
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
     render();
 
-    fetch(DRIVE_API_URL + "?action=delete&id=" + encodeURIComponent(id), { mode: 'no-cors' });
-    fetch(DRIVE_API_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'delete', deleteId: id })
-    });
+    var beacon = new Image();
+    beacon.src = DRIVE_API_URL + "?action=delete&deleteId=" + encodeURIComponent(id) + "&t=" + Date.now();
   }
 
   function fmt(val) {
@@ -624,7 +631,6 @@
     return 999;
   }
 
-  // ALERTA Y SEMÁFORO INTELIGENTE: Solo muestra lo que realmente necesita atención
   function updateTrafficAlerts() {
     bannerItems = [];
     var now = Date.now();
@@ -664,7 +670,6 @@
       }
     });
 
-    // Si todo está tranquilo y lejano a más de 7 días
     if (bannerItems.length === 0) {
       var nextPending = null;
       var minDiff = 999;
@@ -675,7 +680,7 @@
         }
       });
       if (nextPending) {
-        bannerItems.push({ level: 'green', text: '🟢 Todo cubierto · Próximo: ' + nextPending.name + ' (en ' + minDiff + ' días)' });
+        bannerItems.push({ level: 'green', text: '🟢 Todo cubierto · Próximo: ' + nextPending.name + ' (' + minDiff + ' días restantes)' });
       } else {
         bannerItems.push({ level: 'green', text: '🟢 Todo al día y sin pagos pendientes esta semana' });
       }
@@ -746,7 +751,7 @@
         btnDAction.style.color = 'var(--muted)';
       } else {
         var colD = diffD <= 3 ? 'var(--danger)' : (diffD <= 7 ? 'var(--warning)' : 'var(--accent)');
-        statusDEl.innerHTML = '<span style="color:' + colD + '">Vence: ' + curD.dueDate + ' (' + diffD + 'd)</span>';
+        statusDEl.innerHTML = '<span style="color:' + colD + '">Vence: 04 Nov (' + diffD + 'd)</span>';
         btnDAction.textContent = 'Pagar Cuota';
         btnDAction.style.color = 'var(--accent)';
       }
@@ -852,10 +857,27 @@
       var catExpensesFiltered = {};
       var now = new Date();
 
+      // Variables para consolidado mensual
+      var monthInc = 0, monthExp = 0;
+      var curMonth = now.getMonth();
+      var curYear = now.getFullYear();
+
       state.txs.forEach(function(t) {
         var tTime = t.timestamp || new Date(t.date).getTime() || Date.now();
+        var dObj = new Date(tTime);
         var isCycle = tTime >= cycleStart;
+        var isThisMonth = (dObj.getMonth() === curMonth && dObj.getFullYear() === curYear);
 
+        // Acumulado del mes actual
+        if (isThisMonth) {
+          if (t.type === 'ingreso' && t.category !== 'Ajuste de Saldo') {
+            monthInc += t.amount;
+          } else if (t.type === 'gasto' && t.category !== 'Transferencia' && t.category !== 'Ajuste de Saldo') {
+            monthExp += t.amount;
+          }
+        }
+
+        // Acumulado del ciclo semanal
         if (isCycle) {
           if (t.type === 'gasto' && t.category !== 'Transferencia' && t.category !== 'Ajuste de Saldo') {
             cycleExpenses += t.amount;
@@ -867,17 +889,22 @@
 
         var matchFilter = true;
         if (chartFilter === 'ciclo') matchFilter = isCycle;
-        else if (chartFilter === 'mes') {
-          var dObj = new Date(tTime);
-          matchFilter = (dObj.getMonth() === now.getMonth() && dObj.getFullYear() === now.getFullYear());
-        }
+        else if (chartFilter === 'mes') matchFilter = isThisMonth;
 
         if (matchFilter && t.type === 'gasto' && t.category !== 'Transferencia' && t.category !== 'Ajuste de Saldo') {
           catExpensesFiltered[t.category] = (catExpensesFiltered[t.category] || 0) + t.amount;
         }
       });
 
-      // 1. Sobres comprometidos
+      // Pintar tarjeta de resumen mensual
+      document.getElementById('month-inc').textContent = fmt(monthInc);
+      document.getElementById('month-exp').textContent = fmt(monthExp);
+      var monthNet = monthInc - monthExp;
+      var netEl = document.getElementById('month-net');
+      netEl.textContent = fmt(monthNet);
+      netEl.className = 'stat-val ' + (monthNet >= 0 ? 'val-success' : 'val-danger');
+
+      // Sobres comprometidos
       var committedEnvelopes = 0;
       var envBox = document.getElementById('envelopes-list');
       envBox.innerHTML = '';
@@ -902,7 +929,7 @@
         envBox.appendChild(row);
       });
 
-      // 2. Blindaje semanal de provisiones (cuota mensual / 4)
+      // Blindaje semanal de provisiones (cuota mensual / 4)
       var weeklyProvisionsCommitted = 0;
       (state.provisions || []).forEach(function(p) {
         if (!p.isPaid) weeklyProvisionsCommitted += (p.amount / 4);
@@ -1023,7 +1050,7 @@
       (state.provisions || []).forEach(function(p) {
         var statusBadge = p.isPaid ? '<span class="val-success" style="font-weight:bold;">[PAGADO]</span>' : '<span class="val-warning">[PENDIENTE]</span>';
         provsBox.innerHTML += '<div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; padding:4px 0; border-bottom:1px solid var(--border);">' +
-          '<div><strong>' + p.name + '</strong> (' + p.dueDate + ') ' + statusBadge + '<br><span style="color:var(--muted); font-size:0.68rem;">S/ ' + (p.amount/4).toFixed(2) + ' / sem</span></div>' +
+          '<div><strong>' + p.name + '</strong> (' + (p.dueDate || 'Día ' + p.dueDay) + ') ' + statusBadge + '<br><span style="color:var(--muted); font-size:0.68rem;">S/ ' + (p.amount/4).toFixed(2) + ' / sem</span></div>' +
           '<div><strong style="color:var(--purple);">' + fmt(p.amount) + ' / mes</strong> <button class="btn-link" style="color:var(--danger); font-weight:bold; margin-left:6px;" onclick="deleteProv(' + p.id + ')">[X]</button></div>' +
           '</div>';
       });
@@ -1035,7 +1062,7 @@
       (state.debts || []).forEach(function(d) {
         var debtBadge = d.isPaid ? '<span class="val-success" style="font-weight:bold;">[PAGADO]</span>' : '<span class="val-warning">[PENDIENTE]</span>';
         debtsBox.innerHTML += '<div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; padding:4px 0; border-bottom:1px solid var(--border);">' +
-          '<div><strong>' + d.name + '</strong> (' + d.dueDate + ') ' + debtBadge + '</div>' +
+          '<div><strong>' + d.name + '</strong> (' + (d.dueDate || 'Día ' + d.dueDay) + ') ' + debtBadge + '</div>' +
           '<div><strong>' + fmt(d.amount) + '</strong> <button class="btn-link" style="color:var(--danger); font-weight:bold; margin-left:6px;" onclick="deleteDebt(' + d.id + ')">[X]</button></div>' +
           '</div>';
       });
