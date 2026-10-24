@@ -248,7 +248,7 @@
     </div>
   </div>
 
-  <!-- TAB 4: PLANIFICADOR (LIMPIO DE DEUDAS FANTASMAS) -->
+  <!-- TAB 4: PLANIFICADOR -->
   <div id="tab-plan" class="tab-content">
     <div class="header"><h1>Planificador, Sobres y Ahorro</h1></div>
     
@@ -280,7 +280,7 @@
       <div id="debts-list"></div>
       <div style="border-top:1px solid var(--border); padding-top:8px; margin-top:8px;">
         <label>Concepto</label>
-        <input type="text" id="new-debt-name" placeholder="Ej. Cuota Préstamo">
+        <input type="text" id="new-debt-name" placeholder="Ej. Cuota Préstamo 1">
         <div class="grid-2">
           <div><label>Monto (S/)</label><input type="number" id="new-debt-amt" placeholder="70.00"></div>
           <div><label>Fecha Vencimiento</label><input type="date" id="new-debt-date"></div>
@@ -314,7 +314,6 @@
   <button class="nav-btn" onclick="switchTab('plan', this)">Planificador</button>
 </div>
 
-<!-- CANAL INVISIBLE PARA BORRADOS SIN BLOQUEO CORS -->
 <iframe name="hidden_delete_frame" style="display:none; width:0; height:0; border:0;"></iframe>
 <form id="hidden_delete_form" method="POST" target="hidden_delete_frame" style="display:none;">
   <input type="hidden" name="action" value="delete">
@@ -323,13 +322,11 @@
 
 <script>
   var DRIVE_API_URL = "https://script.google.com/macros/s/AKfycbw2KxHq4aC_xk72pXDMlAF5c7gGIMrNLEZnP6Y9Q5TYaLkQJmksx4QZ-RivPsNNeB8/exec";
-  var APP_VERSION = "v5.1_clean_no_ghost_debts";
   var isPrivacy = false;
   var myChart = null;
   var chartFilter = 'ciclo';
   var histFilter = 'hoy';
 
-  // ESTADO LIMPIO: Sin deudas forzadas
   var state = {
     cfg: { lastCycleStart: 0, income: 480.00 },
     accounts: { cash: 15.00, bank: 120.00, reserve: 210.00 },
@@ -345,22 +342,26 @@
     provisions: [
       { id: 101, name: "Cochera", amount: 150.00, dueDate: "2026-10-15", isPaid: false }
     ],
-    debts: [], // Completamente vacío para que tú ingreses lo que desees
+    debts: [],
     goals: [
       { id: 1, name: "Ahorro Hijo", target: 500.00, current: 0.00 }
     ],
     txs: []
   };
 
-  var storedVersion = localStorage.getItem('ctrl_gastos_ver');
-  if (storedVersion !== APP_VERSION) {
-    localStorage.removeItem('ctrl_gastos_state');
-    localStorage.setItem('ctrl_gastos_ver', APP_VERSION);
-  } else {
-    var local = localStorage.getItem('ctrl_gastos_state');
-    if (local) {
-      try { Object.assign(state, JSON.parse(local)); } catch(e) {}
-    }
+  // Carga segura sin vaciar a ceros
+  var local = localStorage.getItem('ctrl_gastos_state');
+  if (local) {
+    try {
+      var parsed = JSON.parse(local);
+      if (parsed) {
+        if (parsed.accounts) state.accounts = parsed.accounts;
+        if (parsed.limits) state.limits = parsed.limits;
+        if (Array.isArray(parsed.provisions) && parsed.provisions.length > 0) state.provisions = parsed.provisions;
+        if (Array.isArray(parsed.debts)) state.debts = parsed.debts.filter(function(d){ return !d.name.includes("200"); });
+        if (Array.isArray(parsed.txs) && parsed.txs.length > 0) state.txs = parsed.txs;
+      }
+    } catch(e) {}
   }
 
   var bannerItems = [];
@@ -382,7 +383,7 @@
     fetch(DRIVE_API_URL, { redirect: "follow" })
       .then(function(res) { return res.json(); })
       .then(function(cloud) {
-        if (cloud && Array.isArray(cloud.txs)) {
+        if (cloud && Array.isArray(cloud.txs) && cloud.txs.length > 0) {
           state.txs = cloud.txs.filter(function(t) {
             return t.category !== 'Ajuste de Saldo' && !(t.desc || '').includes('Sinceramiento');
           });
@@ -937,8 +938,10 @@
       document.getElementById('debt-rot-name').textContent = 'Sin compromisos';
       document.getElementById('debt-rot-status').textContent = 'Al día';
       var btnDAction = document.getElementById('btn-debt-action');
-      btnDAction.textContent = '-';
-      btnDAction.style.color = 'var(--muted)';
+      if (btnDAction) {
+        btnDAction.textContent = '-';
+        btnDAction.style.color = 'var(--muted)';
+      }
     }
   }
 
@@ -1335,4 +1338,92 @@
     state.limits[name.trim()] = limit;
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
     loadPlanSliders();
-    populateCat
+    populateCatSelect();
+    render();
+  }
+
+  function addProvision() {
+    var name = document.getElementById('new-prov-name').value.trim();
+    var amt = parseFloat(document.getElementById('new-prov-amt').value);
+    var dateVal = document.getElementById('new-prov-date').value;
+    if (!name || isNaN(amt) || amt <= 0) return alert("Completa nombre y monto válido.");
+    if (!state.provisions) state.provisions = [];
+    state.provisions.push({ id: Date.now(), name: name, amount: amt, dueDate: dateVal, isPaid: false });
+    document.getElementById('new-prov-name').value = '';
+    document.getElementById('new-prov-amt').value = '';
+    localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
+    loadPlanSliders();
+    render();
+  }
+
+  function deleteProv(id) {
+    if (confirm("¿Eliminar esta provisión permanentemente?")) {
+      state.provisions = state.provisions.filter(function(x) { return x.id != id; });
+      localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
+      loadPlanSliders();
+      render();
+    }
+  }
+
+  function addDebt() {
+    var name = document.getElementById('new-debt-name').value.trim();
+    var amt = parseFloat(document.getElementById('new-debt-amt').value);
+    var dateVal = document.getElementById('new-debt-date').value;
+    var isSingle = document.getElementById('new-debt-single').checked;
+    if (!name || isNaN(amt) || amt <= 0) return alert("Completa concepto y monto válido.");
+    if (!state.debts) state.debts = [];
+    state.debts.push({ id: Date.now(), name: name, amount: amt, dueDate: dateVal, isPaid: false, isSingle: isSingle });
+    document.getElementById('new-debt-name').value = '';
+    document.getElementById('new-debt-amt').value = '';
+    localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
+    loadPlanSliders();
+    render();
+  }
+
+  function deleteDebt(id) {
+    if (confirm("¿Eliminar este compromiso permanentemente?")) {
+      state.debts = state.debts.filter(function(x) { return x.id != id; });
+      localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
+      loadPlanSliders();
+      render();
+    }
+  }
+
+  function addGoal() {
+    var name = document.getElementById('new-goal-name').value.trim();
+    var target = parseFloat(document.getElementById('new-goal-target').value);
+    if (!name || isNaN(target) || target <= 0) return alert("Completa nombre y objetivo válido.");
+    if (!state.goals) state.goals = [];
+    state.goals.push({ id: String(Date.now()), name: name, target: target, current: 0.00 });
+    document.getElementById('new-goal-name').value = '';
+    document.getElementById('new-goal-target').value = '';
+    localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
+    loadPlanSliders();
+  }
+
+  function deleteGoal(id) {
+    if (confirm("¿Eliminar esta meta?")) {
+      state.goals = state.goals.filter(function(x) { return String(x.id) !== String(id); });
+      localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
+      loadPlanSliders();
+    }
+  }
+
+  function saveLimits() {
+    localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
+    alert("Topes guardados con éxito.");
+    switchTab('dash', document.querySelectorAll('.nav-btn')[0]);
+  }
+
+  setInterval(rotateTrafficBanner, 5000);
+  setInterval(function() {
+    nextProvCard();
+    nextDebtCard();
+  }, 5000);
+
+  initDateField();
+  render();
+  fetchCloudData();
+</script>
+</body>
+</html>
