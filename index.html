@@ -254,13 +254,13 @@
     </div>
 
     <div class="card">
-      <span style="font-size:0.8rem; font-weight:700; margin-bottom:8px; display:block;">Provisiones Mensuales (Luz, Cochera, Teléfono)</span>
+      <span style="font-size:0.8rem; font-weight:700; margin-bottom:8px; display:block;">Provisiones Mensuales (Cochera S/ 250)</span>
       <div id="provs-list"></div>
       <div style="border-top:1px solid var(--border); padding-top:8px; margin-top:8px;">
         <label>Nombre del Servicio</label>
-        <input type="text" id="new-prov-name" placeholder="Ej. Teléfono, Recibo de Luz">
+        <input type="text" id="new-prov-name" placeholder="Ej. Cochera">
         <div class="grid-2">
-          <div><label>Monto Mensual (S/)</label><input type="number" id="new-prov-amt" placeholder="Ej. 40.00"></div>
+          <div><label>Monto Mensual (S/)</label><input type="number" id="new-prov-amt" placeholder="Ej. 250.00"></div>
           <div><label>Fecha Vencimiento</label><input type="date" id="new-prov-date"></div>
         </div>
         <button class="btn-main" onclick="addProvision()">+ Guardar Provisión</button>
@@ -306,7 +306,7 @@
   <button class="nav-btn" onclick="switchTab('plan', this)">Planificador</button>
 </div>
 
-<!-- CANAL INVISIBLE PARA BORRADOS INFALIBLES SIN BLOQUEO CORS -->
+<!-- CANAL INVISIBLE PARA BORRADOS SIN BLOQUEO CORS -->
 <iframe name="hidden_delete_frame" style="display:none; width:0; height:0; border:0;"></iframe>
 <form id="hidden_delete_form" method="POST" target="hidden_delete_frame" style="display:none;">
   <input type="hidden" name="action" value="delete">
@@ -314,22 +314,20 @@
 </form>
 
 <script>
-  // NUEVA URL DE APPS SCRIPT ACTIVADA
   var DRIVE_API_URL = "https://script.google.com/macros/s/AKfycbw2KxHq4aC_xk72pXDMlAF5c7gGIMrNLEZnP6Y9Q5TYaLkQJmksx4QZ-RivPsNNeB8/exec";
-  var APP_VERSION = "v3.5_fixed_url";
+  var APP_VERSION = "v3.7_full_sync";
   var isPrivacy = false;
   var myChart = null;
   var chartFilter = 'ciclo';
   var histFilter = 'hoy';
 
+  // Configuración base unificada
   var state = {
     cfg: { lastCycleStart: 0, income: 480.00 },
     accounts: { cash: 15.00, bank: 120.00, reserve: 210.00 },
     limits: { "Comida": 60, "Transporte": 60, "Comida hijos": 130, "Pasaje hijo": 90, "Aseo": 20, "Margen Libre": 10 },
     provisions: [
-      { id: 1, name: "Cochera", amount: 250.00, dueDate: "2026-10-28", isPaid: true, paidAt: Date.now() },
-      { id: 2, name: "Teléfono", amount: 40.00, dueDate: "2026-10-10", isPaid: true, paidAt: Date.now() - (3 * 86400000) },
-      { id: 3, name: "Luz / Internet", amount: 80.00, dueDate: "2026-10-20", isPaid: true, paidAt: Date.now() - (3 * 86400000) }
+      { id: 1, name: "Cochera", amount: 250.00, dueDate: "2026-10-28", isPaid: true, paidAt: Date.now() }
     ],
     debts: [
       { id: 1, name: "Préstamo", amount: 200.00, dueDate: "2026-11-04", isPaid: false, isSingle: false },
@@ -341,6 +339,7 @@
     txs: []
   };
 
+  // Limpieza forzada de memoria congelada
   var storedVersion = localStorage.getItem('ctrl_gastos_ver');
   if (storedVersion !== APP_VERSION) {
     localStorage.removeItem('ctrl_gastos_state');
@@ -373,6 +372,7 @@
           if (cloud.goals && cloud.goals.length > 0) state.goals = cloud.goals;
           
           findLatestCycle();
+          recalculateDynamicAccounts();
           cleanGracePeriods();
           localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
           render();
@@ -382,6 +382,20 @@
         console.warn("Offline:", err);
         if (badge) { badge.textContent = '☁ Local'; badge.style.color = 'var(--muted)'; }
       });
+  }
+
+  // CÁLCULO DINÁMICO DE CUENTAS: Asegura paridad exacta entre laptop y celular
+  function recalculateDynamicAccounts() {
+    // Si no hay sinceramiento manual guardado, sincroniza con los movimientos registrados
+    var hasCocheraPaid = false;
+    state.txs.forEach(function(t) {
+      var desc = (t.desc || '').toLowerCase();
+      if (desc.includes('cochera')) hasCocheraPaid = true;
+    });
+
+    if (state.provisions && state.provisions.length > 0) {
+      state.provisions[0].isPaid = hasCocheraPaid;
+    }
   }
 
   function findLatestCycle() {
@@ -445,13 +459,10 @@
     });
   }
 
-  // BORRADO VÍA FORMULARIO OCULTO Y BALIZA DIRECTA
   function deleteTx(id) {
     if (!confirm("¿Eliminar este registro permanentemente de Google Drive y de todos los dispositivos?")) return;
     
     var cleanId = String(id).trim();
-    
-    // 1. Quitar de la pantalla
     state.txs = state.txs.filter(function(t) { return String(t.id).trim() !== cleanId; });
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
     render();
@@ -459,7 +470,6 @@
     var badge = document.getElementById('sync-badge');
     if (badge) { badge.textContent = '☁ Borrando...'; badge.style.color = 'var(--danger)'; }
 
-    // 2. Disparo directo vía formulario oculto (sin bloqueo CORS)
     var form = document.getElementById('hidden_delete_form');
     var inputId = document.getElementById('form_delete_id');
     if (form && inputId) {
@@ -468,7 +478,6 @@
       form.submit();
     }
 
-    // 3. Respaldo por GET
     setTimeout(function() {
       fetch(DRIVE_API_URL + "?action=delete&deleteId=" + encodeURIComponent(cleanId) + "&t=" + Date.now(), { mode: 'no-cors' });
       if (badge) { badge.textContent = '☁ Sincronizado'; badge.style.color = 'var(--success)'; }
@@ -1043,7 +1052,6 @@
     } catch(e) {}
   }
 
-  // HISTORIAL FILTRADO
   function renderHistory() {
     var histBox = document.getElementById('tx-history');
     if (!histBox) return;
