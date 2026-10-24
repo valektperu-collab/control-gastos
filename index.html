@@ -86,7 +86,7 @@
       <button class="quick-btn" onclick="quickExpense('Margen Libre', 2.50, 'Antojo', true)">Antojo<br><span style="font-size:0.65rem; color:var(--warning)">Hormiga</span></button>
     </div>
 
-    <!-- 1. HERO CARD -->
+    <!-- HERO CARD -->
     <div class="card hero-card" id="hero-card">
       <div class="balance-title">Margen Libre Real (Ciclo Semanal)</div>
       <div id="disp-free" class="balance-amount val-success">S/ 0.00</div>
@@ -101,7 +101,7 @@
       </div>
     </div>
 
-    <!-- 2. MIS CUENTAS REALES -->
+    <!-- MIS CUENTAS REALES -->
     <div class="card">
       <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
         <span style="font-size:0.8rem; font-weight:700;">Mis Cuentas Reales</span>
@@ -126,7 +126,7 @@
       </div>
     </div>
 
-    <!-- 3. BLOQUE MENSUAL FIJO -->
+    <!-- RESUMEN MENSUAL -->
     <div class="card" style="background:var(--card-alt); border-left:4px solid var(--purple);">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
         <span style="font-size:0.75rem; font-weight:800; color:var(--purple); text-transform:uppercase;">Resumen del Mes en Curso</span>
@@ -139,7 +139,7 @@
       </div>
     </div>
 
-    <!-- 4. TARJETAS ROTATIVAS ACTIVAS -->
+    <!-- TARJETAS ROTATIVAS ACTIVAS -->
     <div class="grid-2" style="margin-bottom:12px;">
       <div class="rotator-card" id="card-prov-rotator">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
@@ -162,7 +162,7 @@
       </div>
     </div>
 
-    <!-- 5. GRÁFICO DE TORTA -->
+    <!-- GRÁFICO DE TORTA -->
     <div class="card">
       <div class="grid-4" style="margin-bottom:8px;">
         <button class="filter-btn active" onclick="setChartFilter('ciclo', this)">Ciclo</button>
@@ -176,7 +176,7 @@
       <div id="ranking-list"></div>
     </div>
 
-    <!-- 6. SOBRES ACTIVOS -->
+    <!-- SOBRES ACTIVOS -->
     <div class="card">
       <span style="font-size:0.8rem; font-weight:700; margin-bottom:8px; display:block;">Sobres Presupuestados</span>
       <div id="envelopes-list"></div>
@@ -234,7 +234,44 @@
     </div>
   </div>
 
-  <!-- TAB 3: HISTORIAL -->
+  <!-- TAB 3: AHORRO Y METAS (PESTAÑA DINÁMICA) -->
+  <div id="tab-savings" class="tab-content">
+    <div class="header"><h1>Ahorro y Metas</h1></div>
+    
+    <div class="card" style="background:linear-gradient(135deg, #131c2e 0%, #1f2b45 100%); border-left:4px solid var(--accent);">
+      <div class="balance-title">Fondo Total en Reserva / Bono</div>
+      <div id="sav-total-reserve" class="balance-amount val-accent">S/ 0.00</div>
+      <div class="grid-2" style="margin-top:8px;">
+        <div class="account-box" style="background:#0c121e;">
+          <div class="stat-label">Asignado a Metas</div>
+          <div id="sav-total-assigned" class="stat-val val-success">S/ 0.00</div>
+        </div>
+        <div class="account-box" style="background:#0c121e;">
+          <div class="stat-label">Reserva Libre (Colchón)</div>
+          <div id="sav-total-free" class="stat-val val-warning">S/ 0.00</div>
+        </div>
+      </div>
+      <div class="summary-line" style="margin-top:10px;">
+        <span>El dinero en Reserva protege tu presupuesto semanal.</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <span style="font-size:0.8rem; font-weight:700; margin-bottom:8px; display:block;">Metas de Ahorro en Curso</span>
+      <div id="savings-goals-container"></div>
+    </div>
+
+    <div class="card">
+      <span style="font-size:0.8rem; font-weight:700; margin-bottom:8px; display:block;">+ Crear Nueva Meta de Ahorro</span>
+      <label>Nombre de la Meta</label>
+      <input type="text" id="sav-new-name" placeholder="Ej. Ahorro Hijo, Ropa, Salud">
+      <label>Monto Objetivo (S/)</label>
+      <input type="number" id="sav-new-target" placeholder="Ej. 500.00">
+      <button class="btn-main" onclick="createSavingsGoal()">Guardar Meta en Sheets</button>
+    </div>
+  </div>
+
+  <!-- TAB 4: HISTORIAL -->
   <div id="tab-hist" class="tab-content">
     <div class="header"><h1>Historial de Movimientos</h1></div>
     <div class="card">
@@ -248,9 +285,9 @@
     </div>
   </div>
 
-  <!-- TAB 4: PLANIFICADOR (CLOUD-FIRST) -->
+  <!-- TAB 5: PLANIFICADOR (SOBRES Y COMPROMISOS) -->
   <div id="tab-plan" class="tab-content">
-    <div class="header"><h1>Planificador, Sobres y Ahorro</h1></div>
+    <div class="header"><h1>Planificador y Topes</h1></div>
     
     <div class="card">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
@@ -258,7 +295,7 @@
         <button class="btn-link" onclick="promptAddCategory()">+ Categoría</button>
       </div>
       <div id="sliders-box"></div>
-      <button class="btn-main" style="margin-top:8px;" onclick="saveLimits()">Guardar Topes en la Nube</button>
+      <button class="btn-main" style="margin-top:8px;" onclick="saveLimits()">Guardar Topes en Sheets</button>
     </div>
 
     <div class="card">
@@ -282,43 +319,27 @@
         <label>Concepto</label>
         <input type="text" id="new-debt-name" placeholder="Ej. Cuota Préstamo 1">
         <div class="grid-2">
-          <div><label>Monto (S/)</label><input type="number" id="new-debt-amt" placeholder="70.00"></div>
+          <div><label>Monto (S/)</label><input type="number" id="new-debt-amt" placeholder="80.00"></div>
           <div><label>Fecha Vencimiento</label><input type="date" id="new-debt-date"></div>
         </div>
-        <div style="display:flex; align-items:center; gap:6px; margin: 6px 0 10px 0;">
-          <input type="checkbox" id="new-debt-single" style="width:auto; margin:0;">
-          <span style="font-size:0.75rem; color:var(--muted)">¿Es cuota única? (Se borra al cancelarse)</span>
+        <div class="grid-2">
+          <div><label>Cuotas Totales</label><input type="number" id="new-debt-tot" placeholder="36"></div>
+          <div><label>Cuotas Restantes</label><input type="number" id="new-debt-rem" placeholder="36"></div>
         </div>
         <button class="btn-main" onclick="addDebt()">+ Guardar Compromiso</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <span style="font-size:0.8rem; font-weight:700; margin-bottom:8px; display:block;">Metas de Ahorro</span>
-      <div id="goals-list-plan"></div>
-      <div style="border-top:1px solid var(--border); padding-top:8px; margin-top:8px;">
-        <label>Nombre de la Meta</label>
-        <input type="text" id="new-goal-name" placeholder="Ej. Ahorro Hijo, Ropa">
-        <label>Monto Objetivo (S/)</label>
-        <input type="number" id="new-goal-target" placeholder="Ej. 500.00">
-        <button class="btn-main" onclick="addGoal()">+ Crear Meta</button>
       </div>
     </div>
   </div>
 </div>
 
+<!-- BARRA DE NAVEGACIÓN CON 5 PESTAÑAS (INCLUYE AHORRO) -->
 <div class="nav-tabs">
   <button class="nav-btn active" onclick="switchTab('dash', this)">Panel</button>
   <button class="nav-btn" onclick="switchTab('add', this)">Registro</button>
+  <button class="nav-btn" onclick="switchTab('savings', this)">Ahorro</button>
   <button class="nav-btn" onclick="switchTab('hist', this)">Historial</button>
   <button class="nav-btn" onclick="switchTab('plan', this)">Planificador</button>
 </div>
-
-<iframe name="hidden_delete_frame" style="display:none; width:0; height:0; border:0;"></iframe>
-<form id="hidden_delete_form" method="POST" target="hidden_delete_frame" style="display:none;">
-  <input type="hidden" name="action" value="delete">
-  <input type="hidden" name="deleteId" id="form_delete_id" value="">
-</form>
 
 <script>
   var DRIVE_API_URL = "https://script.google.com/macros/s/AKfycbw2KxHq4aC_xk72pXDMlAF5c7gGIMrNLEZnP6Y9Q5TYaLkQJmksx4QZ-RivPsNNeB8/exec";
@@ -347,7 +368,6 @@
     txs: []
   };
 
-  // Carga local segura mientras responde Google Sheets
   var local = localStorage.getItem('ctrl_gastos_state');
   if (local) {
     try {
@@ -395,7 +415,6 @@
             });
           }
 
-          // Sincronizar Compromisos Fijos de Sheets
           if (Array.isArray(cloud.debts)) {
             var provs = [];
             var realDebts = [];
@@ -410,12 +429,10 @@
             state.debts = realDebts;
           }
 
-          // Sincronizar Topes de Sheets
           if (cloud.limits && Object.keys(cloud.limits).length > 0) {
             state.limits = cloud.limits;
           }
 
-          // Sincronizar Metas de Sheets
           if (Array.isArray(cloud.goals)) {
             state.goals = cloud.goals;
           }
@@ -425,15 +442,15 @@
           cleanGracePeriods();
           localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
           render();
+          renderSavingsTab();
           if (badge) { badge.textContent = '☁ Sincronizado'; badge.style.color = 'var(--success)'; }
         }
       }).catch(function(err) {
-        console.warn("Modo local/offline:", err);
+        console.warn("Modo offline:", err);
         if (badge) { badge.textContent = '☁ Local'; badge.style.color = 'var(--muted)'; }
       });
   }
 
-  // ENVÍO DE ACCIONES HACIA GOOGLE SHEETS
   function postToSheets(payload) {
     var badge = document.getElementById('sync-badge');
     if (badge) { badge.textContent = '☁ Guardando...'; badge.style.color = 'var(--warning)'; }
@@ -528,7 +545,6 @@
     state.txs = state.txs.filter(function(t) { return String(t.id).trim() !== cleanId; });
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
     render();
-
     postToSheets({ action: 'deleteTx', id: cleanId });
   }
 
@@ -541,6 +557,7 @@
     var btn = document.getElementById('btn-privacy');
     if (btn) btn.textContent = isPrivacy ? 'Ver' : 'Ocultar';
     render();
+    renderSavingsTab();
   }
 
   function switchTab(id, btn) {
@@ -554,6 +571,7 @@
       populateFixedSelect();
       initDateField();
     }
+    if (id === 'savings') renderSavingsTab();
     if (id === 'plan') loadPlanSliders();
     if (id === 'dash' || id === 'hist') render();
   }
@@ -789,6 +807,7 @@
     state.accounts[key] = num;
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
     render();
+    renderSavingsTab();
   }
 
   function openTransferModal() {
@@ -812,15 +831,37 @@
     renderHistory();
   }
 
+  // CÁLCULO DE FECHAS UNIVERSAL (CORRIGE NAN)
   function getDaysDiff(dateStr) {
     var now = new Date();
     now.setHours(0,0,0,0);
-    if (dateStr) {
-      var target = new Date(dateStr + "T00:00:00");
-      var diffMs = target.getTime() - now.getTime();
-      return Math.ceil(diffMs / 86400000);
+    if (!dateStr) return 999;
+    
+    var target;
+    if (typeof dateStr === 'string' && dateStr.indexOf('-') > -1 && dateStr.length === 10) {
+      target = new Date(dateStr + "T00:00:00");
+    } else {
+      target = new Date(dateStr);
     }
-    return 999;
+    
+    if (isNaN(target.getTime())) return 999;
+    var diffMs = target.getTime() - now.getTime();
+    return Math.ceil(diffMs / 86400000);
+  }
+
+  // FORMATEADOR VISUAL DE FECHA CORTO
+  function formatShortDate(dateStr) {
+    if (!dateStr) return '';
+    var d;
+    if (typeof dateStr === 'string' && dateStr.indexOf('-') > -1 && dateStr.length === 10) {
+      d = new Date(dateStr + "T00:00:00");
+    } else {
+      d = new Date(dateStr);
+    }
+    if (isNaN(d.getTime())) return String(dateStr).slice(0, 10);
+    var day = d.getDate();
+    var months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Set', 'Oct', 'Nov', 'Dic'];
+    return (day < 10 ? '0' : '') + day + ' ' + months[d.getMonth()];
   }
 
   function updateTrafficAlerts() {
@@ -872,7 +913,8 @@
         }
       });
       if (nextPending) {
-        bannerItems.push({ level: 'green', text: '🟢 Todo cubierto · Próximo: ' + nextPending.name + ' (' + minDiff + ' días restantes)' });
+        var cleanLabel = formatShortDate(nextPending.dueDate);
+        bannerItems.push({ level: 'green', text: '🟢 Todo cubierto · Próximo: ' + nextPending.name + ' (' + minDiff + ' días restantes · ' + cleanLabel + ')' });
       } else {
         bannerItems.push({ level: 'green', text: '🟢 Todo al día y sin pagos pendientes esta semana' });
       }
@@ -920,7 +962,8 @@
         btnAction.style.color = 'var(--muted)';
       } else {
         var col = diffP <= 3 ? 'var(--danger)' : (diffP <= 7 ? 'var(--warning)' : 'var(--accent)');
-        statusEl.innerHTML = '<span style="color:' + col + '">Vence: ' + curP.dueDate + ' (' + diffP + 'd)</span>';
+        var fDateP = formatShortDate(curP.dueDate);
+        statusEl.innerHTML = '<span style="color:' + col + '">Vence: ' + (fDateP || 'Mes') + ' (' + (diffP === 999 ? '-' : diffP + 'd') + ')</span>';
         btnAction.textContent = 'Pagar Servicio';
         btnAction.style.color = 'var(--accent)';
       }
@@ -943,7 +986,10 @@
         btnDAction.style.color = 'var(--muted)';
       } else {
         var colD = diffD <= 3 ? 'var(--danger)' : (diffD <= 7 ? 'var(--warning)' : 'var(--accent)');
-        statusDEl.innerHTML = '<span style="color:' + colD + '">Vence: ' + (curD.dueDate || 'Mensual') + ' (' + diffD + 'd)</span>';
+        var remText = curD.cuotasRestantes ? ' · Quedan ' + curD.cuotasRestantes + 'c' : '';
+        var fDateD = formatShortDate(curD.dueDate);
+        var daysLabel = (diffD === 999 || isNaN(diffD)) ? '' : ' (' + diffD + 'd)';
+        statusDEl.innerHTML = '<span style="color:' + colD + '">Vence: ' + (fDateD || 'Mensual') + daysLabel + remText + '</span>';
         btnDAction.textContent = 'Pagar Cuota';
         btnDAction.style.color = 'var(--accent)';
       }
@@ -1040,6 +1086,114 @@
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
     render();
     postToSheets({ newTx: txObj });
+  }
+
+  // GESTIÓN DINÁMICA DE LA PESTAÑA AHORRO Y METAS
+  function renderSavingsTab() {
+    var totalReserve = state.accounts.reserve || 0;
+    var assignedToGoals = 0;
+
+    (state.goals || []).forEach(function(g) {
+      assignedToGoals += (parseFloat(g.current) || 0);
+    });
+
+    var freeReserve = Math.max(0, totalReserve - assignedToGoals);
+
+    var resEl = document.getElementById('sav-total-reserve');
+    var assEl = document.getElementById('sav-total-assigned');
+    var freEl = document.getElementById('sav-total-free');
+
+    if (resEl) resEl.textContent = fmt(totalReserve);
+    if (assEl) assEl.textContent = fmt(assignedToGoals);
+    if (freEl) freEl.textContent = fmt(freeReserve);
+
+    var container = document.getElementById('savings-goals-container');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!state.goals || state.goals.length === 0) {
+      container.innerHTML = '<span style="font-size:0.75rem; color:var(--muted); display:block; padding:8px 0; text-align:center;">No tienes metas activas. Crea una abajo.</span>';
+      return;
+    }
+
+    state.goals.forEach(function(g) {
+      var cur = parseFloat(g.current) || 0;
+      var tgt = parseFloat(g.target) || 1;
+      var pct = Math.min(100, Math.round((cur / tgt) * 100));
+
+      var card = document.createElement('div');
+      card.style.background = 'var(--card-alt)';
+      card.style.border = '1px solid var(--border)';
+      card.style.borderRadius = '10px';
+      card.style.padding = '10px';
+      card.style.marginBottom = '8px';
+
+      card.innerHTML = 
+        '<div style="display:flex; justify-content:space-between; align-items:center; font-size:0.8rem; margin-bottom:4px;">' +
+          '<strong>' + g.name + '</strong>' +
+          '<button class="btn-link" style="color:var(--danger); font-weight:bold;" onclick="deleteSavingsGoal(\'' + g.id + '\')">[X]</button>' +
+        '</div>' +
+        '<div style="display:flex; justify-content:space-between; font-size:0.72rem; color:var(--muted);">' +
+          '<span>Acumulado: <strong class="val-success">' + fmt(cur) + '</strong></span>' +
+          '<span>Meta: ' + fmt(tgt) + ' (' + pct + '%)</span>' +
+        '</div>' +
+        '<div class="progress-bg"><div class="progress-fill" style="width:' + pct + '%; background:var(--accent);"></div></div>' +
+        '<div style="display:flex; gap:6px; margin-top:8px;">' +
+          '<button class="btn-pill" style="color:var(--accent); flex:1;" onclick="depositToGoal(\'' + g.id + '\')">+ Abonar desde Reserva</button>' +
+        '</div>';
+
+      container.appendChild(card);
+    });
+  }
+
+  function createSavingsGoal() {
+    var name = document.getElementById('sav-new-name').value.trim();
+    var target = parseFloat(document.getElementById('sav-new-target').value);
+
+    if (!name || isNaN(target) || target <= 0) {
+      return alert("Ingresa un nombre y monto objetivo válido.");
+    }
+
+    var goalObj = {
+      id: String(Date.now()),
+      name: name,
+      target: target,
+      current: 0.00
+    };
+
+    if (!state.goals) state.goals = [];
+    state.goals.push(goalObj);
+
+    document.getElementById('sav-new-name').value = '';
+    document.getElementById('sav-new-target').value = '';
+
+    localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
+    renderSavingsTab();
+    postToSheets({ action: 'saveGoal', goal: goalObj });
+  }
+
+  function deleteSavingsGoal(goalId) {
+    if (!confirm("¿Eliminar esta meta de ahorro? Los fondos asignados volverán a figurar como Reserva Libre.")) return;
+
+    state.goals = (state.goals || []).filter(function(g) { return String(g.id) !== String(goalId); });
+    localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
+    renderSavingsTab();
+    postToSheets({ action: 'deleteGoal', id: goalId });
+  }
+
+  function depositToGoal(goalId) {
+    var g = (state.goals || []).find(function(x) { return String(x.id) === String(goalId); });
+    if (!g) return;
+
+    var amtStr = prompt("Monto a abonar a '" + g.name + "' desde tu Reserva (S/):", "50.00");
+    if (!amtStr) return;
+    var amt = parseFloat(amtStr);
+    if (isNaN(amt) || amt <= 0) return alert("Monto inválido.");
+
+    g.current = (parseFloat(g.current) || 0) + amt;
+    localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
+    renderSavingsTab();
+    postToSheets({ action: 'updateGoalDeposit', goalId: goalId, amount: amt });
   }
 
   function render() {
@@ -1263,7 +1417,6 @@
     });
   }
 
-  // PLANIFICADOR CONECTADO DIRECTAMENTE A GOOGLE SHEETS
   function loadPlanSliders() {
     var box = document.getElementById('sliders-box');
     if (box) {
@@ -1290,8 +1443,9 @@
       provsBox.innerHTML = '';
       (state.provisions || []).forEach(function(p) {
         var statusBadge = p.isPaid ? '<span class="val-success" style="font-weight:bold;">[PAGADO]</span>' : '<span class="val-warning">[PENDIENTE]</span>';
+        var fDatePr = formatShortDate(p.dueDate);
         provsBox.innerHTML += '<div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; padding:4px 0; border-bottom:1px solid var(--border);">' +
-          '<div><strong>' + p.name + '</strong> (' + (p.dueDate || 'Mensual') + ') ' + statusBadge + '<br><span style="color:var(--muted); font-size:0.68rem;">S/ ' + (p.amount/4).toFixed(2) + ' / sem</span></div>' +
+          '<div><strong>' + p.name + '</strong> (' + (fDatePr || 'Mensual') + ') ' + statusBadge + '<br><span style="color:var(--muted); font-size:0.68rem;">S/ ' + (p.amount/4).toFixed(2) + ' / sem</span></div>' +
           '<div><strong style="color:var(--purple);">' + fmt(p.amount) + ' / mes</strong> <button class="btn-link" style="color:var(--danger); font-weight:bold; margin-left:6px;" onclick="deleteProv(\'' + p.id + '\')">[X]</button></div>' +
           '</div>';
       });
@@ -1302,20 +1456,11 @@
       debtsBox.innerHTML = '';
       (state.debts || []).forEach(function(d) {
         var debtBadge = d.isPaid ? '<span class="val-success" style="font-weight:bold;">[PAGADO]</span>' : '<span class="val-warning">[PENDIENTE]</span>';
+        var cInfo = (d.cuotasRestantes ? ' · ' + d.cuotasRestantes + '/' + (d.totalCuotas || d.cuotasRestantes) + 'c' : '');
+        var fDateDb = formatShortDate(d.dueDate);
         debtsBox.innerHTML += '<div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; padding:4px 0; border-bottom:1px solid var(--border);">' +
-          '<div><strong>' + d.name + '</strong> (' + (d.dueDate || 'Mensual') + ') ' + debtBadge + '<br><span style="color:var(--muted); font-size:0.68rem;">S/ ' + (d.amount/4).toFixed(2) + ' / sem</span></div>' +
+          '<div><strong>' + d.name + '</strong> (' + (fDateDb || 'Mensual') + cInfo + ') ' + debtBadge + '<br><span style="color:var(--muted); font-size:0.68rem;">S/ ' + (d.amount/4).toFixed(2) + ' / sem</span></div>' +
           '<div><strong>' + fmt(d.amount) + '</strong> <button class="btn-link" style="color:var(--danger); font-weight:bold; margin-left:6px;" onclick="deleteDebt(\'' + d.id + '\')">[X]</button></div>' +
-          '</div>';
-      });
-    }
-
-    var gPlan = document.getElementById('goals-list-plan');
-    if (gPlan) {
-      gPlan.innerHTML = '';
-      (state.goals || []).forEach(function(g) {
-        gPlan.innerHTML += '<div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; padding:4px 0; border-bottom:1px solid var(--border);">' +
-          '<div><strong>' + g.name + '</strong> (Meta: ' + fmt(g.target) + ')</div>' +
-          '<div><strong>Llevas: ' + fmt(g.current || 0) + '</strong> <button class="btn-link" style="color:var(--danger); font-weight:bold; margin-left:6px;" onclick="deleteGoal(\'' + g.id + '\')">[X]</button></div>' +
           '</div>';
       });
     }
@@ -1391,15 +1536,19 @@
     var name = document.getElementById('new-debt-name').value.trim();
     var amt = parseFloat(document.getElementById('new-debt-amt').value);
     var dateVal = document.getElementById('new-debt-date').value;
-    var isSingle = document.getElementById('new-debt-single').checked;
+    var tot = parseInt(document.getElementById('new-debt-tot').value) || 1;
+    var rem = parseInt(document.getElementById('new-debt-rem').value) || tot;
+
     if (!name || isNaN(amt) || amt <= 0) return alert("Completa concepto y monto válido.");
     
-    var debtObj = { id: 'debt_' + Date.now(), name: name, amount: amt, dueDate: dateVal, isPaid: false, isSingle: isSingle, type: 'deuda' };
+    var debtObj = { id: 'debt_' + Date.now(), name: name, amount: amt, dueDate: dateVal, totalCuotas: tot, cuotasRestantes: rem, isPaid: false, type: 'deuda' };
     if (!state.debts) state.debts = [];
     state.debts.push(debtObj);
     
     document.getElementById('new-debt-name').value = '';
     document.getElementById('new-debt-amt').value = '';
+    document.getElementById('new-debt-tot').value = '';
+    document.getElementById('new-debt-rem').value = '';
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
     loadPlanSliders();
     render();
@@ -1413,31 +1562,6 @@
       loadPlanSliders();
       render();
       postToSheets({ action: 'deleteDebt', id: id });
-    }
-  }
-
-  function addGoal() {
-    var name = document.getElementById('new-goal-name').value.trim();
-    var target = parseFloat(document.getElementById('new-goal-target').value);
-    if (!name || isNaN(target) || target <= 0) return alert("Completa nombre y objetivo válido.");
-    
-    var goalObj = { id: 'goal_' + Date.now(), name: name, target: target, current: 0.00 };
-    if (!state.goals) state.goals = [];
-    state.goals.push(goalObj);
-    
-    document.getElementById('new-goal-name').value = '';
-    document.getElementById('new-goal-target').value = '';
-    localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
-    loadPlanSliders();
-    postToSheets({ action: 'saveGoal', goal: goalObj });
-  }
-
-  function deleteGoal(id) {
-    if (confirm("¿Eliminar esta meta permanentemente de todos los dispositivos?")) {
-      state.goals = state.goals.filter(function(x) { return String(x.id) !== String(id); });
-      localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
-      loadPlanSliders();
-      postToSheets({ action: 'deleteGoal', id: id });
     }
   }
 
@@ -1456,6 +1580,7 @@
 
   initDateField();
   render();
+  renderSavingsTab();
   fetchCloudData();
 </script>
 </body>
