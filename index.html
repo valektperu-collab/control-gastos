@@ -183,7 +183,7 @@
     </div>
   </div>
 
-  <!-- TAB 2: REGISTRO (CON SOPORTE DIRECTO DE PAGO DE PROVISIONES/DEUDAS) -->
+  <!-- TAB 2: REGISTRO -->
   <div id="tab-add" class="tab-content">
     <div class="header"><h1>Registrar Movimiento</h1></div>
     <div class="card">
@@ -193,12 +193,11 @@
       <label>Tipo de Operación</label>
       <select id="tx-type" onchange="toggleTxForm()">
         <option value="gasto">Gasto Habitual</option>
-        <option value="pago_fijo">Pagar Provisión / Compromiso (Cochera, Deuda)</option>
+        <option value="pago_fijo">Pagar Provisión / Compromiso</option>
         <option value="ingreso">Ingreso (Sueldo o Bono)</option>
         <option value="transfer">Transferencia entre Cuentas</option>
       </select>
 
-      <!-- SELECCIÓN DIRECTA DE PAGO FIJO (AUTO-COMPLETA NOMBRE Y MONTO) -->
       <div id="grp-pago-fijo" style="display:none;">
         <label>Compromiso a Pagar</label>
         <select id="fixed-item-select" onchange="autoFillFixedItem()"></select>
@@ -249,7 +248,7 @@
     </div>
   </div>
 
-  <!-- TAB 4: PLANIFICADOR -->
+  <!-- TAB 4: PLANIFICADOR (LIMPIO DE DEUDAS FANTASMAS) -->
   <div id="tab-plan" class="tab-content">
     <div class="header"><h1>Planificador, Sobres y Ahorro</h1></div>
     
@@ -263,7 +262,7 @@
     </div>
 
     <div class="card">
-      <span style="font-size:0.8rem; font-weight:700; margin-bottom:8px; display:block;">Provisiones Mensuales (Cochera S/ 150)</span>
+      <span style="font-size:0.8rem; font-weight:700; margin-bottom:8px; display:block;">Provisiones Mensuales</span>
       <div id="provs-list"></div>
       <div style="border-top:1px solid var(--border); padding-top:8px; margin-top:8px;">
         <label>Nombre del Servicio</label>
@@ -281,9 +280,9 @@
       <div id="debts-list"></div>
       <div style="border-top:1px solid var(--border); padding-top:8px; margin-top:8px;">
         <label>Concepto</label>
-        <input type="text" id="new-debt-name" placeholder="Ej. Préstamo">
+        <input type="text" id="new-debt-name" placeholder="Ej. Cuota Préstamo">
         <div class="grid-2">
-          <div><label>Monto (S/)</label><input type="number" id="new-debt-amt" placeholder="Ej. 200.00"></div>
+          <div><label>Monto (S/)</label><input type="number" id="new-debt-amt" placeholder="70.00"></div>
           <div><label>Fecha Vencimiento</label><input type="date" id="new-debt-date"></div>
         </div>
         <div style="display:flex; align-items:center; gap:6px; margin: 6px 0 10px 0;">
@@ -324,15 +323,16 @@
 
 <script>
   var DRIVE_API_URL = "https://script.google.com/macros/s/AKfycbw2KxHq4aC_xk72pXDMlAF5c7gGIMrNLEZnP6Y9Q5TYaLkQJmksx4QZ-RivPsNNeB8/exec";
-  var APP_VERSION = "v4.4_pay_provisions_in_register";
+  var APP_VERSION = "v5.1_clean_no_ghost_debts";
   var isPrivacy = false;
   var myChart = null;
   var chartFilter = 'ciclo';
   var histFilter = 'hoy';
 
+  // ESTADO LIMPIO: Sin deudas forzadas
   var state = {
     cfg: { lastCycleStart: 0, income: 480.00 },
-    accounts: { cash: 95.00, bank: 120.00, reserve: 210.00 },
+    accounts: { cash: 15.00, bank: 120.00, reserve: 210.00 },
     limits: { 
       "Comida": 60, 
       "Transporte": 60, 
@@ -343,12 +343,9 @@
       "Margen Libre": 10 
     },
     provisions: [
-      { id: 1, name: "Cochera", amount: 150.00, dueDate: "2026-10-15", isPaid: false }
+      { id: 101, name: "Cochera", amount: 150.00, dueDate: "2026-10-15", isPaid: false }
     ],
-    debts: [
-      { id: 1, name: "Préstamo", amount: 200.00, dueDate: "2026-11-04", isPaid: false, isSingle: false },
-      { id: 2, name: "Deuda Massiel", amount: 30.00, dueDate: "2026-10-13", isPaid: true, paidAt: Date.now() - (4 * 86400000), isSingle: true }
-    ],
+    debts: [], // Completamente vacío para que tú ingreses lo que desees
     goals: [
       { id: 1, name: "Ahorro Hijo", target: 500.00, current: 0.00 }
     ],
@@ -646,7 +643,6 @@
     });
   }
 
-  // LLENAR LISTA DE COMPROMISOS / PROVISIONES EN REGISTRO
   function populateFixedSelect() {
     var sel = document.getElementById('fixed-item-select');
     if (!sel) return;
@@ -667,7 +663,6 @@
     });
   }
 
-  // AUTOCOMPLETAR NOMBRE Y MONTO AL ELEGIR UN COMPROMISO
   function autoFillFixedItem() {
     var sel = document.getElementById('fixed-item-select');
     if (!sel || !sel.value) return;
@@ -934,10 +929,16 @@
         btnDAction.style.color = 'var(--muted)';
       } else {
         var colD = diffD <= 3 ? 'var(--danger)' : (diffD <= 7 ? 'var(--warning)' : 'var(--accent)');
-        statusDEl.innerHTML = '<span style="color:' + colD + '">Vence: 04 Nov (' + diffD + 'd)</span>';
+        statusDEl.innerHTML = '<span style="color:' + colD + '">Vence: ' + (curD.dueDate || 'Mensual') + ' (' + diffD + 'd)</span>';
         btnDAction.textContent = 'Pagar Cuota';
         btnDAction.style.color = 'var(--accent)';
       }
+    } else {
+      document.getElementById('debt-rot-name').textContent = 'Sin compromisos';
+      document.getElementById('debt-rot-status').textContent = 'Al día';
+      var btnDAction = document.getElementById('btn-debt-action');
+      btnDAction.textContent = '-';
+      btnDAction.style.color = 'var(--muted)';
     }
   }
 
@@ -1273,7 +1274,7 @@
       (state.provisions || []).forEach(function(p) {
         var statusBadge = p.isPaid ? '<span class="val-success" style="font-weight:bold;">[PAGADO]</span>' : '<span class="val-warning">[PENDIENTE]</span>';
         provsBox.innerHTML += '<div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; padding:4px 0; border-bottom:1px solid var(--border);">' +
-          '<div><strong>' + p.name + '</strong> (' + (p.dueDate || 'Día ' + p.dueDay) + ') ' + statusBadge + '<br><span style="color:var(--muted); font-size:0.68rem;">S/ ' + (p.amount/4).toFixed(2) + ' / sem</span></div>' +
+          '<div><strong>' + p.name + '</strong> (' + (p.dueDate || 'Mensual') + ') ' + statusBadge + '<br><span style="color:var(--muted); font-size:0.68rem;">S/ ' + (p.amount/4).toFixed(2) + ' / sem</span></div>' +
           '<div><strong style="color:var(--purple);">' + fmt(p.amount) + ' / mes</strong> <button class="btn-link" style="color:var(--danger); font-weight:bold; margin-left:6px;" onclick="deleteProv(' + p.id + ')">[X]</button></div>' +
           '</div>';
       });
@@ -1285,7 +1286,7 @@
       (state.debts || []).forEach(function(d) {
         var debtBadge = d.isPaid ? '<span class="val-success" style="font-weight:bold;">[PAGADO]</span>' : '<span class="val-warning">[PENDIENTE]</span>';
         debtsBox.innerHTML += '<div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; padding:4px 0; border-bottom:1px solid var(--border);">' +
-          '<div><strong>' + d.name + '</strong> (' + (d.dueDate || 'Día ' + d.dueDay) + ') ' + debtBadge + '</div>' +
+          '<div><strong>' + d.name + '</strong> (' + (d.dueDate || 'Mensual') + ') ' + debtBadge + '<br><span style="color:var(--muted); font-size:0.68rem;">S/ ' + (d.amount/4).toFixed(2) + ' / sem</span></div>' +
           '<div><strong>' + fmt(d.amount) + '</strong> <button class="btn-link" style="color:var(--danger); font-weight:bold; margin-left:6px;" onclick="deleteDebt(' + d.id + ')">[X]</button></div>' +
           '</div>';
       });
@@ -1334,92 +1335,4 @@
     state.limits[name.trim()] = limit;
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
     loadPlanSliders();
-    populateCatSelect();
-    render();
-  }
-
-  function addProvision() {
-    var name = document.getElementById('new-prov-name').value.trim();
-    var amt = parseFloat(document.getElementById('new-prov-amt').value);
-    var dateVal = document.getElementById('new-prov-date').value;
-    if (!name || isNaN(amt) || amt <= 0) return alert("Completa nombre y monto válido.");
-    if (!state.provisions) state.provisions = [];
-    state.provisions.push({ id: Date.now(), name: name, amount: amt, dueDate: dateVal, isPaid: false });
-    document.getElementById('new-prov-name').value = '';
-    document.getElementById('new-prov-amt').value = '';
-    localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
-    loadPlanSliders();
-    render();
-  }
-
-  function deleteProv(id) {
-    if (confirm("¿Eliminar esta provisión?")) {
-      state.provisions = state.provisions.filter(function(x) { return x.id != id; });
-      localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
-      loadPlanSliders();
-      render();
-    }
-  }
-
-  function addDebt() {
-    var name = document.getElementById('new-debt-name').value.trim();
-    var amt = parseFloat(document.getElementById('new-debt-amt').value);
-    var dateVal = document.getElementById('new-debt-date').value;
-    var isSingle = document.getElementById('new-debt-single').checked;
-    if (!name || isNaN(amt) || amt <= 0) return alert("Completa concepto y monto válido.");
-    if (!state.debts) state.debts = [];
-    state.debts.push({ id: Date.now(), name: name, amount: amt, dueDate: dateVal, isPaid: false, isSingle: isSingle });
-    document.getElementById('new-debt-name').value = '';
-    document.getElementById('new-debt-amt').value = '';
-    localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
-    loadPlanSliders();
-    render();
-  }
-
-  function deleteDebt(id) {
-    if (confirm("¿Eliminar este compromiso?")) {
-      state.debts = state.debts.filter(function(x) { return x.id != id; });
-      localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
-      loadPlanSliders();
-      render();
-    }
-  }
-
-  function addGoal() {
-    var name = document.getElementById('new-goal-name').value.trim();
-    var target = parseFloat(document.getElementById('new-goal-target').value);
-    if (!name || isNaN(target) || target <= 0) return alert("Completa nombre y objetivo válido.");
-    if (!state.goals) state.goals = [];
-    state.goals.push({ id: String(Date.now()), name: name, target: target, current: 0.00 });
-    document.getElementById('new-goal-name').value = '';
-    document.getElementById('new-goal-target').value = '';
-    localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
-    loadPlanSliders();
-  }
-
-  function deleteGoal(id) {
-    if (confirm("¿Eliminar esta meta?")) {
-      state.goals = state.goals.filter(function(x) { return String(x.id) !== String(id); });
-      localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
-      loadPlanSliders();
-    }
-  }
-
-  function saveLimits() {
-    localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
-    alert("Topes guardados con éxito.");
-    switchTab('dash', document.querySelectorAll('.nav-btn')[0]);
-  }
-
-  setInterval(rotateTrafficBanner, 5000);
-  setInterval(function() {
-    nextProvCard();
-    nextDebtCard();
-  }, 5000);
-
-  initDateField();
-  render();
-  fetchCloudData();
-</script>
-</body>
-</html>
+    populateCat
