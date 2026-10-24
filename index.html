@@ -43,7 +43,7 @@
     .nav-btn.active { color: var(--accent); }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
-    .tx-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.82rem; }
+    .tx-item { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 0.82rem; }
     .val-danger { color: var(--danger); } .val-warning { color: var(--warning); } .val-success { color: var(--success); } .val-accent { color: var(--accent); } .val-purple { color: var(--purple); }
 
     .traffic-banner {
@@ -102,7 +102,7 @@
       </div>
     </div>
 
-    <!-- 2. MIS CUENTAS REALES (SUBIDO DIRECTAMENTE DESPUÉS DE LA HERO CARD) -->
+    <!-- 2. MIS CUENTAS REALES -->
     <div class="card">
       <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
         <span style="font-size:0.8rem; font-weight:700;">Mis Cuentas Reales</span>
@@ -226,10 +226,18 @@
     </div>
   </div>
 
-  <!-- TAB 3: HISTORIAL -->
+  <!-- TAB 3: HISTORIAL (CON FILTROS Y VISTA COMPACTA) -->
   <div id="tab-hist" class="tab-content">
-    <div class="header"><h1>Historial de Transacciones</h1></div>
-    <div class="card" id="tx-history"></div>
+    <div class="header"><h1>Historial de Movimientos</h1></div>
+    <div class="card">
+      <div class="grid-4" style="margin-bottom:10px;">
+        <button class="filter-btn active" id="btn-hist-hoy" onclick="setHistFilter('hoy', this)">Hoy</button>
+        <button class="filter-btn" id="btn-hist-10" onclick="setHistFilter('ultimos10', this)">Últimos 10</button>
+        <button class="filter-btn" id="btn-hist-mes" onclick="setHistFilter('mes', this)">Este Mes</button>
+        <button class="filter-btn" id="btn-hist-todo" onclick="setHistFilter('todo', this)">Todo</button>
+      </div>
+      <div id="tx-history"></div>
+    </div>
   </div>
 
   <!-- TAB 4: PLANIFICADOR -->
@@ -300,10 +308,11 @@
 
 <script>
   var DRIVE_API_URL = "https://script.google.com/macros/s/AKfycbwBiFWVPJgq5NsKwtAVJmYhZvzGzGqeUImDAsQCCZFfNEiaG5HvU_rs3vf1IfYFBuU/exec";
-  var APP_VERSION = "v3.2_accounts_top";
+  var APP_VERSION = "v3.3_hist_filters";
   var isPrivacy = false;
   var myChart = null;
   var chartFilter = 'ciclo';
+  var histFilter = 'hoy';
 
   var state = {
     cfg: { lastCycleStart: 0, income: 480.00 },
@@ -421,31 +430,40 @@
     fetch(DRIVE_API_URL, {
       method: 'POST',
       mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify({ newTx: tx })
     }).then(function() {
       if (badge) { badge.textContent = '☁ Sincronizado'; badge.style.color = 'var(--success)'; }
     });
   }
 
+  // BORRADO PERMANENTE
   function deleteTx(id) {
     if (!confirm("¿Eliminar este registro permanentemente de Google Drive y de todos los dispositivos?")) return;
     
-    // 1. Quitarlo de la pantalla y de la memoria de inmediato
-    state.txs = state.txs.filter(function(t) { return String(t.id).trim() !== String(id).trim(); });
+    var cleanId = String(id).trim();
+    state.txs = state.txs.filter(function(t) { return String(t.id).trim() !== cleanId; });
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
     render();
 
-    // 2. Envío directo infalible a Google Apps Script
-    fetch(DRIVE_API_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ action: 'delete', deleteId: String(id).trim() })
-    }).catch(function(err) {
-      console.error("Error al enviar borrado:", err);
+    var badge = document.getElementById('sync-badge');
+    if (badge) { badge.textContent = '☁ Borrando...'; badge.style.color = 'var(--danger)'; }
+
+    fetch(DRIVE_API_URL + "?action=delete&deleteId=" + encodeURIComponent(cleanId) + "&t=" + Date.now(), {
+      method: 'GET',
+      mode: 'no-cors'
+    }).then(function() {
+      if (badge) { badge.textContent = '☁ Sincronizado'; badge.style.color = 'var(--success)'; }
+    }).catch(function() {
+      fetch(DRIVE_API_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'delete', deleteId: cleanId })
+      });
     });
   }
+
   function fmt(val) {
     return isPrivacy ? 'S/ ••••' : 'S/ ' + Number(val || 0).toFixed(2);
   }
@@ -624,6 +642,14 @@
     document.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
     if (btn) btn.classList.add('active');
     render();
+  }
+
+  function setHistFilter(fil, btn) {
+    histFilter = fil;
+    var parent = btn.parentElement;
+    parent.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    renderHistory();
   }
 
   function getDaysDiff(dateStr) {
@@ -1006,29 +1032,55 @@
     } catch(e) {}
   }
 
+  // HISTORIAL FILTRADO
   function renderHistory() {
     var histBox = document.getElementById('tx-history');
     if (!histBox) return;
-    histBox.innerHTML = '<span style="font-size:0.8rem; font-weight:700; margin-bottom:6px; display:block;">Todos los Movimientos Históricos</span>';
+    histBox.innerHTML = '';
 
     if (!state.txs || state.txs.length === 0) {
-      histBox.innerHTML += '<span style="font-size:0.75rem; color:var(--muted)">Sin transacciones guardadas.</span>';
-    } else {
-      state.txs.forEach(function(tx) {
-        var item = document.createElement('div');
-        item.className = 'tx-item';
-        var isGasto = tx.type === 'gasto';
-        var sign = isGasto ? '-' : (tx.type === 'ingreso' ? '+' : '⇄');
-        var col = isGasto ? 'var(--danger)' : (tx.type === 'ingreso' ? 'var(--success)' : 'var(--accent)');
-
-        item.innerHTML = '<div><strong>' + tx.desc + '</strong><br><span style="font-size:0.68rem; color:var(--muted)">' + (tx.date ? tx.date.slice(0, 10) : '') + ' · ' + (tx.category || '') + ' (' + (tx.account || '') + ')</span></div>' +
-          '<div style="display:flex; align-items:center; gap:8px;">' +
-          '<span style="font-weight:800; color:' + col + '">' + sign + ' ' + fmt(tx.amount) + '</span>' +
-          '<button class="btn-link" style="color:var(--danger); font-size:0.85rem; font-weight:900;" onclick="deleteTx(\'' + tx.id + '\')">✕</button>' +
-          '</div>';
-        histBox.appendChild(item);
-      });
+      histBox.innerHTML = '<span style="font-size:0.75rem; color:var(--muted); padding:10px 0; display:block; text-align:center;">Sin transacciones guardadas.</span>';
+      return;
     }
+
+    var now = new Date();
+    var curDay = now.getDate();
+    var curMonth = now.getMonth();
+    var curYear = now.getFullYear();
+
+    var filteredList = state.txs.filter(function(tx) {
+      var d = new Date(tx.timestamp || tx.date);
+      if (histFilter === 'hoy') {
+        return d.getDate() === curDay && d.getMonth() === curMonth && d.getFullYear() === curYear;
+      } else if (histFilter === 'mes') {
+        return d.getMonth() === curMonth && d.getFullYear() === curYear;
+      }
+      return true;
+    });
+
+    if (histFilter === 'ultimos10') {
+      filteredList = state.txs.slice(0, 10);
+    }
+
+    if (filteredList.length === 0) {
+      histBox.innerHTML = '<span style="font-size:0.75rem; color:var(--muted); padding:10px 0; display:block; text-align:center;">No hay registros para este filtro.</span>';
+      return;
+    }
+
+    filteredList.forEach(function(tx) {
+      var item = document.createElement('div');
+      item.className = 'tx-item';
+      var isGasto = tx.type === 'gasto';
+      var sign = isGasto ? '-' : (tx.type === 'ingreso' ? '+' : '⇄');
+      var col = isGasto ? 'var(--danger)' : (tx.type === 'ingreso' ? 'var(--success)' : 'var(--accent)');
+
+      item.innerHTML = '<div><strong>' + tx.desc + '</strong><br><span style="font-size:0.68rem; color:var(--muted)">' + (tx.date ? tx.date.slice(0, 10) : '') + ' · ' + (tx.category || '') + ' (' + (tx.account || '') + ')</span></div>' +
+        '<div style="display:flex; align-items:center; gap:8px;">' +
+        '<span style="font-weight:800; color:' + col + '">' + sign + ' ' + fmt(tx.amount) + '</span>' +
+        '<button class="btn-link" style="color:var(--danger); font-size:0.95rem; font-weight:900; padding:4px;" onclick="deleteTx(\'' + tx.id + '\')">✕</button>' +
+        '</div>';
+      histBox.appendChild(item);
+    });
   }
 
   function loadPlanSliders() {
