@@ -48,9 +48,10 @@
 
     /* BANNER SEMÁFORO Y TARJETAS ROTATIVAS */
     .traffic-banner {
-      border-radius: 10px; padding: 8px 12px; margin-bottom: 12px;
+      border-radius: 10px; padding: 9px 12px; margin-bottom: 12px;
       display: flex; justify-content: space-between; align-items: center;
-      font-size: 0.75rem; font-weight: 700; cursor: pointer;
+      font-size: 0.76rem; font-weight: 700; cursor: pointer;
+      transition: all 0.3s ease;
     }
     .traffic-red { background: rgba(244, 63, 94, 0.15); border: 1px solid var(--danger); color: #fecdd3; }
     .traffic-amber { background: rgba(251, 191, 36, 0.15); border: 1px solid var(--warning); color: #fef3c7; }
@@ -65,10 +66,10 @@
 <div class="container">
   <!-- TAB 1: PANEL -->
   <div id="tab-dash" class="tab-content active">
-    <!-- BANNER SEMÁFORO DINÁMICO -->
+    <!-- BANNER SEMÁFORO AUTOMÁTICO -->
     <div id="traffic-banner" class="traffic-banner traffic-green" onclick="rotateTrafficBanner()">
       <span id="banner-text">Cargando vencimientos...</span>
-      <span id="banner-dots" style="font-size: 0.65rem; color: var(--muted);">1/1</span>
+      <span id="banner-dots" style="font-size: 0.65rem; color: var(--muted);">1/1 ↻</span>
     </div>
 
     <div class="header">
@@ -102,7 +103,7 @@
       </div>
     </div>
 
-    <!-- TARJETAS ROTATIVAS EN EL PANEL: VENCIMIENTOS -->
+    <!-- TARJETAS ROTATIVAS AUTOMÁTICAS: PROVISIONES Y COMPROMISOS -->
     <div class="grid-2" style="margin-bottom:12px;">
       <div class="rotator-card" id="card-prov-rotator">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
@@ -235,14 +236,14 @@
 
     <!-- PROVISIONES MENSUALES -->
     <div class="card">
-      <span style="font-size:0.8rem; font-weight:700; margin-bottom:8px; display:block;">Provisiones Mensuales (Luz, Cochera S/ 250, etc.)</span>
+      <span style="font-size:0.8rem; font-weight:700; margin-bottom:8px; display:block;">Provisiones Mensuales (Luz, Cochera, Teléfono)</span>
       <div id="provs-list"></div>
       <div style="border-top:1px solid var(--border); padding-top:8px; margin-top:8px;">
         <label>Nombre del Servicio</label>
         <input type="text" id="new-prov-name" placeholder="Ej. Teléfono, Recibo de Luz">
         <div class="grid-2">
           <div><label>Monto Mensual (S/)</label><input type="number" id="new-prov-amt" placeholder="Ej. 40.00"></div>
-          <div><label>Día de Vencimiento</label><input type="number" id="new-prov-day" placeholder="Ej. 10"></div>
+          <div><label>Fecha Próximo Vencimiento</label><input type="date" id="new-prov-date"></div>
         </div>
         <button class="btn-main" onclick="addProvision()">+ Guardar Provisión</button>
       </div>
@@ -254,10 +255,10 @@
       <div id="debts-list"></div>
       <div style="border-top:1px solid var(--border); padding-top:8px; margin-top:8px;">
         <label>Concepto</label>
-        <input type="text" id="new-debt-name" placeholder="Ej. Deuda Massiel">
+        <input type="text" id="new-debt-name" placeholder="Ej. Préstamo Personal">
         <div class="grid-2">
           <div><label>Monto (S/)</label><input type="number" id="new-debt-amt" placeholder="Ej. 30.00"></div>
-          <div><label>Día Pago</label><input type="number" id="new-debt-day" placeholder="Ej. 13"></div>
+          <div><label>Fecha Próximo Vencimiento</label><input type="date" id="new-debt-date"></div>
         </div>
         <button class="btn-main" onclick="addDebt()">+ Guardar Compromiso</button>
       </div>
@@ -296,13 +297,16 @@
     cfg: { lastCycleStart: 0, income: 480.00 },
     accounts: { cash: 142.50, bank: 0.00, reserve: 0.00 },
     limits: { "Comida": 60, "Transporte": 60, "Comida hijos": 120, "Pasaje hijo": 80, "Aseo": 20, "Margen Libre": 10 },
+    // Provisiones de octubre ya canceladas
     provisions: [
-      { id: 1, name: "Teléfono", amount: 40.00, dueDay: 10, isPaid: false },
-      { id: 2, name: "Cochera", amount: 250.00, dueDay: 28, isPaid: true },
-      { id: 3, name: "Luz / Internet", amount: 80.00, dueDay: 20, isPaid: false }
+      { id: 1, name: "Cochera", amount: 250.00, dueDate: "2026-10-28", isPaid: true },
+      { id: 2, name: "Teléfono", amount: 40.00, dueDate: "2026-10-10", isPaid: true },
+      { id: 3, name: "Luz / Internet", amount: 80.00, dueDate: "2026-10-20", isPaid: true }
     ],
+    // Deuda activa configurada para el 4 de noviembre
     debts: [
-      { id: 1, name: "Deuda Massiel", amount: 30.00, dueDay: 13, isPaid: false }
+      { id: 1, name: "Préstamo", amount: 200.00, dueDate: "2026-11-04", isPaid: false },
+      { id: 2, name: "Deuda Massiel", amount: 30.00, dueDate: "2026-10-13", isPaid: true }
     ],
     goals: [
       { id: 1, name: "Ahorro Hijo", target: 500.00, current: 0.00 }
@@ -336,7 +340,6 @@
           if (cloud.goals && cloud.goals.length > 0) state.goals = cloud.goals;
           
           findLatestCycle();
-          checkAutoPaidStatus();
           localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
           render();
           if (badge) { badge.textContent = '☁ Sincronizado'; badge.style.color = 'var(--success)'; }
@@ -356,25 +359,6 @@
       }
     });
     if (latestCycleStart > 0) state.cfg.lastCycleStart = latestCycleStart;
-  }
-
-  function checkAutoPaidStatus() {
-    var now = new Date();
-    var curMonth = now.getMonth();
-    var curYear = now.getFullYear();
-
-    state.txs.forEach(function(t) {
-      var d = new Date(t.timestamp || t.date);
-      if (d.getMonth() === curMonth && d.getFullYear() === curYear && t.type === 'gasto') {
-        var descLower = (t.desc || '').toLowerCase();
-        (state.provisions || []).forEach(function(p) {
-          if (descLower.includes(p.name.toLowerCase())) p.isPaid = true;
-        });
-        (state.debts || []).forEach(function(b) {
-          if (descLower.includes(b.name.toLowerCase())) b.isPaid = true;
-        });
-      }
-    });
   }
 
   function pushSingleTx(tx) {
@@ -554,7 +538,6 @@
     state.txs.unshift(txObj);
     document.getElementById('tx-desc').value = '';
     document.getElementById('tx-amount').value = '';
-    checkAutoPaidStatus();
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
     render();
     pushSingleTx(txObj);
@@ -587,48 +570,73 @@
     render();
   }
 
-  // LÓGICA DE ALERTAS Y SEMÁFORO
+  // CÁLCULO DE DÍAS RESTANTES BASADO EN FECHA REAL (YYYY-MM-DD)
+  function getDaysDiff(dateStr, dueDayFallback) {
+    var now = new Date();
+    now.setHours(0,0,0,0);
+    
+    if (dateStr) {
+      var target = new Date(dateStr + "T00:00:00");
+      var diffMs = target.getTime() - now.getTime();
+      return Math.ceil(diffMs / 86400000);
+    } else if (dueDayFallback) {
+      var curDay = now.getDate();
+      return dueDayFallback - curDay;
+    }
+    return 999;
+  }
+
+  // LÓGICA DE SEMÁFORO Y ALERTAS
   function updateTrafficAlerts() {
-    var today = new Date().getDate();
     bannerItems = [];
 
     // Recorre provisiones
     (state.provisions || []).forEach(function(p) {
-      var diff = p.dueDay - today;
+      var diff = getDaysDiff(p.dueDate, p.dueDay);
       var level = 'green', text = '';
       if (p.isPaid) {
-        level = 'green'; text = p.name + ' (S/ ' + p.amount.toFixed(2) + '): Pagado ✔';
+        level = 'green';
+        text = '✔ ' + p.name + ' (S/ ' + p.amount.toFixed(2) + '): Cancelado / Al día';
       } else if (diff < 0) {
-        level = 'red'; text = 'VENCIDO: ' + p.name + ' venció el día ' + p.dueDay + ' (S/ ' + p.amount.toFixed(2) + ')';
+        level = 'red';
+        text = '⚠ VENCIDO: ' + p.name + ' (S/ ' + p.amount.toFixed(2) + ') venció hace ' + Math.abs(diff) + ' día(s)';
       } else if (diff <= 3) {
-        level = 'red'; text = 'URGENTE: ' + p.name + ' vence en ' + diff + ' día(s) (S/ ' + p.amount.toFixed(2) + ')';
+        level = 'red';
+        text = '🚨 URGENTE: ' + p.name + ' vence en ' + diff + ' día(s) (S/ ' + p.amount.toFixed(2) + ')';
       } else if (diff <= 7) {
-        level = 'amber'; text = 'PRÓXIMO: ' + p.name + ' vence el día ' + p.dueDay + ' (S/ ' + p.amount.toFixed(2) + ')';
+        level = 'amber';
+        text = '⏳ PRÓXIMO: ' + p.name + ' vence en ' + diff + ' día(s) (S/ ' + p.amount.toFixed(2) + ')';
       } else {
-        level = 'green'; text = p.name + ' vence el día ' + p.dueDay + ' (Al día)';
+        level = 'green';
+        text = '🟢 ' + p.name + ' vence en ' + diff + ' días (' + (p.dueDate || 'día ' + p.dueDay) + ')';
       }
-      bannerItems.push({ type: 'prov', obj: p, level: level, text: text, diff: diff });
+      bannerItems.push({ type: 'prov', obj: p, level: level, text: text });
     });
 
     // Recorre deudas
     (state.debts || []).forEach(function(d) {
-      var diff = d.dueDay - today;
+      var diff = getDaysDiff(d.dueDate, d.dueDay);
       var level = 'green', text = '';
       if (d.isPaid) {
-        level = 'green'; text = d.name + ' (S/ ' + d.amount.toFixed(2) + '): Pagado ✔';
+        level = 'green';
+        text = '✔ ' + d.name + ' (S/ ' + d.amount.toFixed(2) + '): Cancelado';
       } else if (diff < 0) {
-        level = 'red'; text = 'VENCIDO: ' + d.name + ' venció el día ' + d.dueDay + ' (S/ ' + d.amount.toFixed(2) + ')';
+        level = 'red';
+        text = '⚠ VENCIDO: ' + d.name + ' (S/ ' + d.amount.toFixed(2) + ') venció';
       } else if (diff <= 3) {
-        level = 'red'; text = 'URGENTE: ' + d.name + ' vence en ' + diff + ' día(s) (S/ ' + d.amount.toFixed(2) + ')';
+        level = 'red';
+        text = '🚨 URGENTE: ' + d.name + ' vence en ' + diff + ' día(s) (S/ ' + d.amount.toFixed(2) + ')';
       } else if (diff <= 7) {
-        level = 'amber'; text = 'PRÓXIMO: ' + d.name + ' vence el día ' + d.dueDay + ' (S/ ' + d.amount.toFixed(2) + ')';
+        level = 'amber';
+        text = '⏳ PRÓXIMO: ' + d.name + ' vence en ' + diff + ' día(s) (S/ ' + d.amount.toFixed(2) + ')';
       } else {
-        level = 'green'; text = d.name + ' vence el día ' + d.dueDay + ' (Al día)';
+        level = 'green';
+        text = '🟢 ' + d.name + ' vence el 4 Nov (' + diff + ' días restantes)';
       }
-      bannerItems.push({ type: 'debt', obj: d, level: level, text: text, diff: diff });
+      bannerItems.push({ type: 'debt', obj: d, level: level, text: text });
     });
 
-    // Prioriza mostrar primero rojos, luego ámbar, luego verdes
+    // Ordenar priorizando pendientes activos
     bannerItems.sort(function(a, b) {
       var score = { red: 1, amber: 2, green: 3 };
       return score[a.level] - score[b.level];
@@ -663,20 +671,19 @@
     if (provs.length > 0) {
       if (provCardIdx >= provs.length) provCardIdx = 0;
       var curP = provs[provCardIdx];
-      var today = new Date().getDate();
-      var diffP = curP.dueDay - today;
+      var diffP = getDaysDiff(curP.dueDate, curP.dueDay);
       document.getElementById('prov-rot-dot').textContent = (provCardIdx + 1) + '/' + provs.length + ' ↻';
       document.getElementById('prov-rot-name').textContent = curP.name + ' (S/ ' + curP.amount.toFixed(2) + ')';
       
       var statusEl = document.getElementById('prov-rot-status');
       var btnAction = document.getElementById('btn-prov-action');
       if (curP.isPaid) {
-        statusEl.innerHTML = '<span class="val-success">✔ Pagado en este mes</span>';
-        btnAction.textContent = 'Ya Pagado';
+        statusEl.innerHTML = '<span class="val-success">✔ Cancelado / Al día</span>';
+        btnAction.textContent = 'Pagado';
         btnAction.style.color = 'var(--muted)';
       } else {
         var col = diffP <= 3 ? 'var(--danger)' : (diffP <= 7 ? 'var(--warning)' : 'var(--accent)');
-        statusEl.innerHTML = '<span style="color:' + col + '">Vence día ' + curP.dueDay + ' (' + (diffP >= 0 ? diffP + ' días' : 'Vencido') + ')</span>';
+        statusEl.innerHTML = '<span style="color:' + col + '">Vence: ' + (curP.dueDate || 'Día ' + curP.dueDay) + ' (' + diffP + 'd)</span>';
         btnAction.textContent = 'Pagar Servicio';
         btnAction.style.color = 'var(--accent)';
       }
@@ -686,20 +693,19 @@
     if (debts.length > 0) {
       if (debtCardIdx >= debts.length) debtCardIdx = 0;
       var curD = debts[debtCardIdx];
-      var todayD = new Date().getDate();
-      var diffD = curD.dueDay - todayD;
+      var diffD = getDaysDiff(curD.dueDate, curD.dueDay);
       document.getElementById('debt-rot-dot').textContent = (debtCardIdx + 1) + '/' + debts.length + ' ↻';
       document.getElementById('debt-rot-name').textContent = curD.name + ' (S/ ' + curD.amount.toFixed(2) + ')';
       
       var statusDEl = document.getElementById('debt-rot-status');
       var btnDAction = document.getElementById('btn-debt-action');
       if (curD.isPaid) {
-        statusDEl.innerHTML = '<span class="val-success">✔ Liquidado este mes</span>';
-        btnDAction.textContent = 'Liquidado';
+        statusDEl.innerHTML = '<span class="val-success">✔ Cancelado / Al día</span>';
+        btnDAction.textContent = 'Cancelado';
         btnDAction.style.color = 'var(--muted)';
       } else {
         var colD = diffD <= 3 ? 'var(--danger)' : (diffD <= 7 ? 'var(--warning)' : 'var(--accent)');
-        statusDEl.innerHTML = '<span style="color:' + colD + '">Vence día ' + curD.dueDay + ' (' + (diffD >= 0 ? diffD + ' días' : 'Vencido') + ')</span>';
+        statusDEl.innerHTML = '<span style="color:' + colD + '">Vence: ' + (curD.dueDate || 'Día ' + curD.dueDay) + ' (' + diffD + 'd)</span>';
         btnDAction.textContent = 'Pagar Cuota';
         btnDAction.style.color = 'var(--accent)';
       }
@@ -708,12 +714,18 @@
 
   function nextProvCard() {
     var p = state.provisions || [];
-    if (p.length > 0) { provCardIdx = (provCardIdx + 1) % p.length; renderRotatorCards(); }
+    if (p.length > 0) {
+      provCardIdx = (provCardIdx + 1) % p.length;
+      renderRotatorCards();
+    }
   }
 
   function nextDebtCard() {
     var d = state.debts || [];
-    if (d.length > 0) { debtCardIdx = (debtCardIdx + 1) % d.length; renderRotatorCards(); }
+    if (d.length > 0) {
+      debtCardIdx = (debtCardIdx + 1) % d.length;
+      renderRotatorCards();
+    }
   }
 
   function payProvCurrent() {
@@ -948,9 +960,9 @@
     if (provsBox) {
       provsBox.innerHTML = '';
       (state.provisions || []).forEach(function(p) {
-        var statusBadge = p.isPaid ? '<span class="val-success" style="font-weight:bold;">[PAGADO]</span>' : '';
+        var statusBadge = p.isPaid ? '<span class="val-success" style="font-weight:bold;">[PAGADO]</span>' : '<span class="val-warning">[PENDIENTE]</span>';
         provsBox.innerHTML += '<div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; padding:4px 0; border-bottom:1px solid var(--border);">' +
-          '<div><strong>' + p.name + '</strong> (Vence día ' + p.dueDay + ') ' + statusBadge + '<br><span style="color:var(--muted); font-size:0.68rem;">S/ ' + (p.amount/4).toFixed(2) + ' / sem</span></div>' +
+          '<div><strong>' + p.name + '</strong> (' + (p.dueDate || 'Día ' + p.dueDay) + ') ' + statusBadge + '<br><span style="color:var(--muted); font-size:0.68rem;">S/ ' + (p.amount/4).toFixed(2) + ' / sem</span></div>' +
           '<div><strong style="color:var(--purple);">' + fmt(p.amount) + ' / mes</strong> <button class="btn-link" style="color:var(--danger); font-weight:bold; margin-left:6px;" onclick="deleteProv(' + p.id + ')">[X]</button></div>' +
           '</div>';
       });
@@ -960,9 +972,9 @@
     if (debtsBox) {
       debtsBox.innerHTML = '';
       (state.debts || []).forEach(function(d) {
-        var debtBadge = d.isPaid ? '<span class="val-success" style="font-weight:bold;">[PAGADO]</span>' : '';
+        var debtBadge = d.isPaid ? '<span class="val-success" style="font-weight:bold;">[PAGADO]</span>' : '<span class="val-warning">[PENDIENTE]</span>';
         debtsBox.innerHTML += '<div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; padding:4px 0; border-bottom:1px solid var(--border);">' +
-          '<div><strong>' + d.name + '</strong> (Día ' + d.dueDay + ') ' + debtBadge + '</div>' +
+          '<div><strong>' + d.name + '</strong> (' + (d.dueDate || 'Día ' + d.dueDay) + ') ' + debtBadge + '</div>' +
           '<div><strong>' + fmt(d.amount) + '</strong> <button class="btn-link" style="color:var(--danger); font-weight:bold; margin-left:6px;" onclick="deleteDebt(' + d.id + ')">[X]</button></div>' +
           '</div>';
       });
@@ -993,10 +1005,10 @@
   function addProvision() {
     var name = document.getElementById('new-prov-name').value.trim();
     var amt = parseFloat(document.getElementById('new-prov-amt').value);
-    var day = parseInt(document.getElementById('new-prov-day').value) || 10;
+    var dateVal = document.getElementById('new-prov-date').value;
     if (!name || isNaN(amt) || amt <= 0) return alert("Completa nombre y monto válido.");
     if (!state.provisions) state.provisions = [];
-    state.provisions.push({ id: Date.now(), name: name, amount: amt, dueDay: day, isPaid: false });
+    state.provisions.push({ id: Date.now(), name: name, amount: amt, dueDate: dateVal, isPaid: false });
     document.getElementById('new-prov-name').value = '';
     document.getElementById('new-prov-amt').value = '';
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
@@ -1016,10 +1028,10 @@
   function addDebt() {
     var name = document.getElementById('new-debt-name').value.trim();
     var amt = parseFloat(document.getElementById('new-debt-amt').value);
-    var day = parseInt(document.getElementById('new-debt-day').value) || 15;
+    var dateVal = document.getElementById('new-debt-date').value;
     if (!name || isNaN(amt) || amt <= 0) return alert("Completa concepto y monto válido.");
     if (!state.debts) state.debts = [];
-    state.debts.push({ id: Date.now(), name: name, amount: amt, dueDay: day, isPaid: false });
+    state.debts.push({ id: Date.now(), name: name, amount: amt, dueDate: dateVal, isPaid: false });
     document.getElementById('new-debt-name').value = '';
     document.getElementById('new-debt-amt').value = '';
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
@@ -1062,7 +1074,13 @@
     switchTab('dash', document.querySelectorAll('.nav-btn')[0]);
   }
 
-  setInterval(rotateTrafficBanner, 6000);
+  // Deslizadores automáticos cada 5 segundos
+  setInterval(rotateTrafficBanner, 5000);
+  setInterval(function() {
+    nextProvCard();
+    nextDebtCard();
+  }, 5000);
+
   render();
   fetchCloudData();
 </script>
