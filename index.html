@@ -234,7 +234,7 @@
     </div>
   </div>
 
-  <!-- TAB 3: AHORRO Y METAS (PESTAÑA DINÁMICA) -->
+  <!-- TAB 3: AHORRO Y METAS -->
   <div id="tab-savings" class="tab-content">
     <div class="header"><h1>Ahorro y Metas</h1></div>
     
@@ -285,7 +285,7 @@
     </div>
   </div>
 
-  <!-- TAB 5: PLANIFICADOR (SOBRES Y COMPROMISOS) -->
+  <!-- TAB 5: PLANIFICADOR -->
   <div id="tab-plan" class="tab-content">
     <div class="header"><h1>Planificador y Topes</h1></div>
     
@@ -332,7 +332,7 @@
   </div>
 </div>
 
-<!-- BARRA DE NAVEGACIÓN CON 5 PESTAÑAS (INCLUYE AHORRO) -->
+<!-- NAVEGACIÓN INFERIOR (5 PESTAÑAS) -->
 <div class="nav-tabs">
   <button class="nav-btn active" onclick="switchTab('dash', this)">Panel</button>
   <button class="nav-btn" onclick="switchTab('add', this)">Registro</button>
@@ -395,7 +395,6 @@
     }
   }
 
-  // DESCARGA CENTRALIZADA DESDE GOOGLE SHEETS
   function fetchCloudData() {
     var badge = document.getElementById('sync-badge');
     if (badge) { badge.textContent = '☁ Sincronizando...'; badge.style.color = 'var(--warning)'; }
@@ -507,16 +506,14 @@
     var keptDebts = [];
     (state.debts || []).forEach(function(b) {
       if (b.isPaid && b.paidAt && (now - b.paidAt > twoDaysMs)) {
-        if (!b.isSingle) {
-          b.isPaid = false;
-          b.paidAt = null;
-          if (b.dueDate) {
-            var d = new Date(b.dueDate + "T00:00:00");
-            d.setMonth(d.getMonth() + 1);
-            b.dueDate = d.toISOString().slice(0, 10);
-          }
-          keptDebts.push(b);
+        b.isPaid = false;
+        b.paidAt = null;
+        if (b.dueDate) {
+          var d = new Date(b.dueDate + "T00:00:00");
+          d.setMonth(d.getMonth() + 1);
+          b.dueDate = d.toISOString().slice(0, 10);
         }
+        keptDebts.push(b);
       } else {
         keptDebts.push(b);
       }
@@ -831,34 +828,35 @@
     renderHistory();
   }
 
-  // CÁLCULO DE FECHAS UNIVERSAL (CORRIGE NAN)
+  // CÁLCULO DE FECHAS SEGURO Y EXACTO
+  function parseDateSafely(dateStr) {
+    if (!dateStr) return null;
+    var s = String(dateStr).trim();
+    if (s.indexOf('-') > -1 && s.length >= 10) {
+      var p = s.slice(0, 10).split('-');
+      return new Date(parseInt(p[0]), parseInt(p[1]) - 1, parseInt(p[2]), 0, 0, 0);
+    }
+    var d = new Date(s);
+    if (!isNaN(d.getTime())) {
+      if (d.getFullYear() < 2020) d.setFullYear(new Date().getFullYear());
+      d.setHours(0,0,0,0);
+      return d;
+    }
+    return null;
+  }
+
   function getDaysDiff(dateStr) {
+    var target = parseDateSafely(dateStr);
+    if (!target) return 999;
     var now = new Date();
     now.setHours(0,0,0,0);
-    if (!dateStr) return 999;
-    
-    var target;
-    if (typeof dateStr === 'string' && dateStr.indexOf('-') > -1 && dateStr.length === 10) {
-      target = new Date(dateStr + "T00:00:00");
-    } else {
-      target = new Date(dateStr);
-    }
-    
-    if (isNaN(target.getTime())) return 999;
     var diffMs = target.getTime() - now.getTime();
     return Math.ceil(diffMs / 86400000);
   }
 
-  // FORMATEADOR VISUAL DE FECHA CORTO
   function formatShortDate(dateStr) {
-    if (!dateStr) return '';
-    var d;
-    if (typeof dateStr === 'string' && dateStr.indexOf('-') > -1 && dateStr.length === 10) {
-      d = new Date(dateStr + "T00:00:00");
-    } else {
-      d = new Date(dateStr);
-    }
-    if (isNaN(d.getTime())) return String(dateStr).slice(0, 10);
+    var d = parseDateSafely(dateStr);
+    if (!d) return '';
     var day = d.getDate();
     var months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Set', 'Oct', 'Nov', 'Dic'];
     return (day < 10 ? '0' : '') + day + ' ' + months[d.getMonth()];
@@ -986,10 +984,13 @@
         btnDAction.style.color = 'var(--muted)';
       } else {
         var colD = diffD <= 3 ? 'var(--danger)' : (diffD <= 7 ? 'var(--warning)' : 'var(--accent)');
-        var remText = curD.cuotasRestantes ? ' · Quedan ' + curD.cuotasRestantes + 'c' : '';
+        var totCuotas = parseInt(curD.totalCuotas) || 1;
+        var remCuotas = parseInt(curD.cuotasRestantes) || totCuotas;
+        var cuotaActual = Math.max(1, (totCuotas - remCuotas + 1));
+        var cInfo = (totCuotas > 1) ? ' · Cuota ' + cuotaActual + '/' + totCuotas : '';
         var fDateD = formatShortDate(curD.dueDate);
         var daysLabel = (diffD === 999 || isNaN(diffD)) ? '' : ' (' + diffD + 'd)';
-        statusDEl.innerHTML = '<span style="color:' + colD + '">Vence: ' + (fDateD || 'Mensual') + daysLabel + remText + '</span>';
+        statusDEl.innerHTML = '<span style="color:' + colD + '">Vence: ' + (fDateD || '04 Nov') + daysLabel + cInfo + '</span>';
         btnDAction.textContent = 'Pagar Cuota';
         btnDAction.style.color = 'var(--accent)';
       }
@@ -1088,7 +1089,6 @@
     postToSheets({ newTx: txObj });
   }
 
-  // GESTIÓN DINÁMICA DE LA PESTAÑA AHORRO Y METAS
   function renderSavingsTab() {
     var totalReserve = state.accounts.reserve || 0;
     var assignedToGoals = 0;
@@ -1292,7 +1292,7 @@
       var freeEl = document.getElementById('disp-free');
       freeEl.textContent = fmt(realFree);
       freeEl.className = 'balance-amount ' + (realFree < 0 ? 'val-danger' : (realFree <= 20 ? 'val-warning' : 'val-success'));
-      document.getElementById('hero-card').style.borderLeftColor = (realFree < 0 ? 'var(--danger)' : (realFree <= 20 ? 'var(--warning)' : 'var(--success)'));
+      document.getElementById('hero-card').style.borderLeftColor = (realFree < 0 ? 'var(--danger)' : (realFree <= 20 ? 'var(--warning)' : 'val-success'));
 
       document.getElementById('disp-committed').textContent = fmt(totalCommitted);
       document.getElementById('sum-inc').textContent = fmt(cycleIncome);
@@ -1456,7 +1456,10 @@
       debtsBox.innerHTML = '';
       (state.debts || []).forEach(function(d) {
         var debtBadge = d.isPaid ? '<span class="val-success" style="font-weight:bold;">[PAGADO]</span>' : '<span class="val-warning">[PENDIENTE]</span>';
-        var cInfo = (d.cuotasRestantes ? ' · ' + d.cuotasRestantes + '/' + (d.totalCuotas || d.cuotasRestantes) + 'c' : '');
+        var totC = parseInt(d.totalCuotas) || 1;
+        var remC = parseInt(d.cuotasRestantes) || totC;
+        var actC = Math.max(1, (totC - remC + 1));
+        var cInfo = (totC > 1 ? ' · Cuota ' + actC + '/' + totC : '');
         var fDateDb = formatShortDate(d.dueDate);
         debtsBox.innerHTML += '<div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; padding:4px 0; border-bottom:1px solid var(--border);">' +
           '<div><strong>' + d.name + '</strong> (' + (fDateDb || 'Mensual') + cInfo + ') ' + debtBadge + '<br><span style="color:var(--muted); font-size:0.68rem;">S/ ' + (d.amount/4).toFixed(2) + ' / sem</span></div>' +
