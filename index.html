@@ -184,7 +184,7 @@
     </div>
   </div>
 
-  <!-- TAB 2: REGISTRO (CON CAMPO FECHA EDITABLE Y CATEGORÍAS ACTIVAS) -->
+  <!-- TAB 2: REGISTRO (CON CAMPO FECHA Y FILTRO DE SOBRES ACTIVOS) -->
   <div id="tab-add" class="tab-content">
     <div class="header"><h1>Registrar Movimiento</h1></div>
     <div class="card">
@@ -318,7 +318,7 @@
 
 <script>
   var DRIVE_API_URL = "https://script.google.com/macros/s/AKfycbw2KxHq4aC_xk72pXDMlAF5c7gGIMrNLEZnP6Y9Q5TYaLkQJmksx4QZ-RivPsNNeB8/exec";
-  var APP_VERSION = "v4.0_active_envelopes";
+  var APP_VERSION = "v4.1_restore_balances";
   var isPrivacy = false;
   var myChart = null;
   var chartFilter = 'ciclo';
@@ -327,7 +327,7 @@
   // Configuración con Pasaje Massiel y Pasaje Kalid ya integrados
   var state = {
     cfg: { lastCycleStart: 0, income: 480.00 },
-    accounts: { cash: 15.00, bank: 120.00, reserve: 210.00 },
+    accounts: { cash: 95.00, bank: 120.00, reserve: 210.00 },
     limits: { 
       "Comida": 60, 
       "Transporte": 60, 
@@ -477,10 +477,26 @@
     });
   }
 
+  // BORRADO CON REINTEGRO AUTOMÁTICO DEL DINERO AL BOLSILLO
   function deleteTx(id) {
     if (!confirm("¿Eliminar este registro permanentemente de Google Drive y de todos los dispositivos?")) return;
     
     var cleanId = String(id).trim();
+    var txToDelete = state.txs.find(function(t) { return String(t.id).trim() === cleanId; });
+
+    if (txToDelete) {
+      var amt = parseFloat(txToDelete.amount) || 0;
+      var accRaw = (txToDelete.account || '').toLowerCase();
+      var accKey = accRaw.includes('banco') || accRaw.includes('yape') ? 'bank' : (accRaw.includes('reserva') ? 'reserve' : 'cash');
+      
+      // Devolver saldo a la cuenta real
+      if (txToDelete.type === 'gasto') {
+        state.accounts[accKey] += amt;
+      } else if (txToDelete.type === 'ingreso') {
+        state.accounts[accKey] -= amt;
+      }
+    }
+    
     state.txs = state.txs.filter(function(t) { return String(t.id).trim() !== cleanId; });
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
     render();
@@ -599,7 +615,6 @@
     document.getElementById('grp-cat').style.display = (t === 'gasto') ? 'block' : 'none';
   }
 
-  // REGLA CLAVE: Solo categorías activas que tengan presupuesto asignado > 0
   function populateCatSelect() {
     var sel = document.getElementById('tx-cat');
     if (!sel) return;
@@ -1313,27 +1328,4 @@
 
   function deleteGoal(id) {
     if (confirm("¿Eliminar esta meta?")) {
-      state.goals = state.goals.filter(function(x) { return String(x.id) !== String(id); });
-      localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
-      loadPlanSliders();
-    }
-  }
-
-  function saveLimits() {
-    localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
-    alert("Topes guardados con éxito.");
-    switchTab('dash', document.querySelectorAll('.nav-btn')[0]);
-  }
-
-  setInterval(rotateTrafficBanner, 5000);
-  setInterval(function() {
-    nextProvCard();
-    nextDebtCard();
-  }, 5000);
-
-  initDateField();
-  render();
-  fetchCloudData();
-</script>
-</body>
-</html>
+      state.goals = state.goals.filter(function(x) { return String(x.
