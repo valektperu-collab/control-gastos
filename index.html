@@ -102,7 +102,7 @@
       </div>
     </div>
 
-    <!-- 2. MIS CUENTAS REALES -->
+    <!-- 2. MIS CUENTAS REALES (SUBIDO DIRECTAMENTE DEBAJO DE LA HERO CARD) -->
     <div class="card">
       <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
         <span style="font-size:0.8rem; font-weight:700;">Mis Cuentas Reales</span>
@@ -314,8 +314,9 @@
 </form>
 
 <script>
-  var DRIVE_API_URL = "https://script.google.com/macros/s/AKfycbwBiFWVPJgq5NsKwtAVJmYhZvzGzGqeUImDAsQCCZFfNEiaG5HvU_rs3vf1IfYFBuU/exec";
-  var APP_VERSION = "v3.4_real_delete";
+  // NUEVA URL DE APPS SCRIPT ACTIVADA
+  var DRIVE_API_URL = "https://script.google.com/macros/s/AKfycbw2KxHq4aC_xk72pXDMlAF5c7gGIMrNLEZnP6Y9Q5TYaLkQJmksx4QZ-RivPsNNeB8/exec";
+  var APP_VERSION = "v3.5_fixed_url";
   var isPrivacy = false;
   var myChart = null;
   var chartFilter = 'ciclo';
@@ -444,13 +445,13 @@
     });
   }
 
-  // MÉTODO INFALIBLE DE BORRADO VÍA FORMULARIO OCULTO (SIN BLOQUEO CORS)
+  // BORRADO VÍA FORMULARIO OCULTO Y BALIZA DIRECTA
   function deleteTx(id) {
     if (!confirm("¿Eliminar este registro permanentemente de Google Drive y de todos los dispositivos?")) return;
     
     var cleanId = String(id).trim();
     
-    // 1. Quitarlo de la pantalla de inmediato
+    // 1. Quitar de la pantalla
     state.txs = state.txs.filter(function(t) { return String(t.id).trim() !== cleanId; });
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
     render();
@@ -458,7 +459,7 @@
     var badge = document.getElementById('sync-badge');
     if (badge) { badge.textContent = '☁ Borrando...'; badge.style.color = 'var(--danger)'; }
 
-    // 2. Disparo por Formulario HTML Oculto (Los navegadores NUNCA lo bloquean)
+    // 2. Disparo directo vía formulario oculto (sin bloqueo CORS)
     var form = document.getElementById('hidden_delete_form');
     var inputId = document.getElementById('form_delete_id');
     if (form && inputId) {
@@ -467,7 +468,7 @@
       form.submit();
     }
 
-    // 3. Respaldo secundario por GET
+    // 3. Respaldo por GET
     setTimeout(function() {
       fetch(DRIVE_API_URL + "?action=delete&deleteId=" + encodeURIComponent(cleanId) + "&t=" + Date.now(), { mode: 'no-cors' });
       if (badge) { badge.textContent = '☁ Sincronizado'; badge.style.color = 'var(--success)'; }
