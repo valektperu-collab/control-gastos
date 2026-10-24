@@ -87,7 +87,7 @@
       <button class="quick-btn" onclick="quickExpense('Margen Libre', 2.50, 'Antojo', true)">Antojo<br><span style="font-size:0.65rem; color:var(--warning)">Hormiga</span></button>
     </div>
 
-    <!-- 1. HERO CARD (CICLO SEMANAL BLINDADO) -->
+    <!-- 1. HERO CARD -->
     <div class="card hero-card" id="hero-card">
       <div class="balance-title">Margen Libre Real (Ciclo Semanal)</div>
       <div id="disp-free" class="balance-amount val-success">S/ ••••</div>
@@ -102,7 +102,7 @@
       </div>
     </div>
 
-    <!-- 2. MIS CUENTAS REALES (SUBIDO DIRECTAMENTE DEBAJO DE LA HERO CARD) -->
+    <!-- 2. MIS CUENTAS REALES -->
     <div class="card">
       <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
         <span style="font-size:0.8rem; font-weight:700;">Mis Cuentas Reales</span>
@@ -226,7 +226,7 @@
     </div>
   </div>
 
-  <!-- TAB 3: HISTORIAL (CON FILTROS Y VISTA COMPACTA) -->
+  <!-- TAB 3: HISTORIAL (ORDENADO CRONOLÓGICAMENTE) -->
   <div id="tab-hist" class="tab-content">
     <div class="header"><h1>Historial de Movimientos</h1></div>
     <div class="card">
@@ -240,14 +240,14 @@
     </div>
   </div>
 
-  <!-- TAB 4: PLANIFICADOR -->
+  <!-- TAB 4: PLANIFICADOR (CON EDICIÓN Y ELIMINACIÓN DE CATEGORÍAS) -->
   <div id="tab-plan" class="tab-content">
     <div class="header"><h1>Planificador, Sobres y Ahorro</h1></div>
     
     <div class="card">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
         <span style="font-size:0.8rem; font-weight:700;">Topes de Sobres</span>
-        <button class="btn-link" onclick="promptAddCategory()">+ Nueva Categoría</button>
+        <button class="btn-link" onclick="promptAddCategory()">+ Categoría</button>
       </div>
       <div id="sliders-box"></div>
       <button class="btn-main" style="margin-top:8px;" onclick="saveLimits()">Guardar Topes</button>
@@ -315,13 +315,13 @@
 
 <script>
   var DRIVE_API_URL = "https://script.google.com/macros/s/AKfycbw2KxHq4aC_xk72pXDMlAF5c7gGIMrNLEZnP6Y9Q5TYaLkQJmksx4QZ-RivPsNNeB8/exec";
-  var APP_VERSION = "v3.7_full_sync";
+  var APP_VERSION = "v3.8_sort_categories";
   var isPrivacy = false;
   var myChart = null;
   var chartFilter = 'ciclo';
   var histFilter = 'hoy';
 
-  // Configuración base unificada
+  // Sobres estándar unificados (sin categorías duplicadas ni desactualizadas)
   var state = {
     cfg: { lastCycleStart: 0, income: 480.00 },
     accounts: { cash: 15.00, bank: 120.00, reserve: 210.00 },
@@ -339,7 +339,6 @@
     txs: []
   };
 
-  // Limpieza forzada de memoria congelada
   var storedVersion = localStorage.getItem('ctrl_gastos_ver');
   if (storedVersion !== APP_VERSION) {
     localStorage.removeItem('ctrl_gastos_state');
@@ -368,9 +367,13 @@
             return t.category !== 'Ajuste de Saldo' && !(t.desc || '').includes('Sinceramiento');
           });
 
-          if (cloud.limits && Object.keys(cloud.limits).length > 0) state.limits = cloud.limits;
-          if (cloud.goals && cloud.goals.length > 0) state.goals = cloud.goals;
-          
+          // ORDENAMIENTO CRONOLÓGICO ESTRICTO: De más reciente a más antiguo
+          state.txs.sort(function(a, b) {
+            var timeA = a.timestamp || new Date(a.date).getTime() || 0;
+            var timeB = b.timestamp || new Date(b.date).getTime() || 0;
+            return timeB - timeA;
+          });
+
           findLatestCycle();
           recalculateDynamicAccounts();
           cleanGracePeriods();
@@ -384,9 +387,7 @@
       });
   }
 
-  // CÁLCULO DINÁMICO DE CUENTAS: Asegura paridad exacta entre laptop y celular
   function recalculateDynamicAccounts() {
-    // Si no hay sinceramiento manual guardado, sincroniza con los movimientos registrados
     var hasCocheraPaid = false;
     state.txs.forEach(function(t) {
       var desc = (t.desc || '').toLowerCase();
@@ -1052,6 +1053,7 @@
     } catch(e) {}
   }
 
+  // HISTORIAL CRONOLÓGICO REAL
   function renderHistory() {
     var histBox = document.getElementById('tx-history');
     if (!histBox) return;
@@ -1062,23 +1064,38 @@
       return;
     }
 
+    // Ordenar de más nuevo a más antiguo
+    var sorted = state.txs.slice().sort(function(a, b) {
+      var tA = a.timestamp || new Date(a.date).getTime() || 0;
+      var tB = b.timestamp || new Date(b.date).getTime() || 0;
+      return tB - tA;
+    });
+
     var now = new Date();
     var curDay = now.getDate();
     var curMonth = now.getMonth();
     var curYear = now.getFullYear();
 
-    var filteredList = state.txs.filter(function(tx) {
-      var d = new Date(tx.timestamp || tx.date);
-      if (histFilter === 'hoy') {
-        return d.getDate() === curDay && d.getMonth() === curMonth && d.getFullYear() === curYear;
-      } else if (histFilter === 'mes') {
-        return d.getMonth() === curMonth && d.getFullYear() === curYear;
-      }
-      return true;
-    });
+    var filteredList = [];
 
-    if (histFilter === 'ultimos10') {
-      filteredList = state.txs.slice(0, 10);
+    if (histFilter === 'hoy') {
+      filteredList = sorted.filter(function(tx) {
+        var d = new Date(tx.timestamp || tx.date);
+        return d.getDate() === curDay && d.getMonth() === curMonth && d.getFullYear() === curYear;
+      });
+      // Si hoy aún no hay gastos, muestra los últimos 5 para que la vista no quede en blanco
+      if (filteredList.length === 0) {
+        filteredList = sorted.slice(0, 5);
+      }
+    } else if (histFilter === 'ultimos10') {
+      filteredList = sorted.slice(0, 10);
+    } else if (histFilter === 'mes') {
+      filteredList = sorted.filter(function(tx) {
+        var d = new Date(tx.timestamp || tx.date);
+        return d.getMonth() === curMonth && d.getFullYear() === curYear;
+      });
+    } else {
+      filteredList = sorted;
     }
 
     if (filteredList.length === 0) {
@@ -1102,14 +1119,23 @@
     });
   }
 
+  // PLANIFICADOR: CON BOTONES PARA RENOMBRAR Y ELIMINAR CATEGORÍAS
   function loadPlanSliders() {
     var box = document.getElementById('sliders-box');
     if (box) {
       box.innerHTML = '';
       Object.keys(state.limits).forEach(function(c) {
         var row = document.createElement('div');
-        row.style.marginBottom = '6px';
-        row.innerHTML = '<div style="display:flex; justify-content:space-between; font-size:0.75rem;"><strong>' + c + '</strong><span id="sl-val-' + c + '">' + fmt(state.limits[c]) + '</span></div>' +
+        row.style.marginBottom = '8px';
+        row.style.padding = '6px';
+        row.style.background = 'var(--card-alt)';
+        row.style.borderRadius = '8px';
+        row.innerHTML = '<div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; margin-bottom:4px;">' +
+          '<div><strong>' + c + '</strong> ' +
+          '<button class="btn-link" style="color:var(--accent); font-size:0.7rem; margin-left:4px;" onclick="renameCategory(\'' + c + '\')">✏️</button>' +
+          '<button class="btn-link" style="color:var(--danger); font-size:0.7rem; margin-left:4px;" onclick="deleteCategory(\'' + c + '\')">🗑️</button>' +
+          '</div>' +
+          '<span id="sl-val-' + c + '" style="font-weight:700;">' + fmt(state.limits[c]) + '</span></div>' +
           '<input type="range" min="0" max="250" step="5" value="' + state.limits[c] + '" oninput="document.getElementById(\'sl-val-' + c + '\').textContent = fmt(this.value); state.limits[\'' + c + '\'] = parseFloat(this.value);">';
         box.appendChild(row);
       });
@@ -1151,13 +1177,38 @@
     }
   }
 
-  function promptAddCategory() {
-    var name = prompt("Nombre de la nueva categoría / sobre:");
-    if (!name) return;
-    var limit = parseFloat(prompt("Tope presupuestado semanal (S/):", "50.00")) || 0;
-    state.limits[name] = limit;
+  function renameCategory(oldName) {
+    var newName = prompt("Nuevo nombre para la categoría:", oldName);
+    if (!newName || newName.trim() === "" || newName.trim() === oldName) return;
+    newName = newName.trim();
+    
+    var val = state.limits[oldName];
+    delete state.limits[oldName];
+    state.limits[newName] = val;
+    
     localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
     loadPlanSliders();
+    populateCatSelect();
+    render();
+  }
+
+  function deleteCategory(catName) {
+    if (!confirm("¿Eliminar la categoría '" + catName + "' de tus sobres y listas?")) return;
+    delete state.limits[catName];
+    localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
+    loadPlanSliders();
+    populateCatSelect();
+    render();
+  }
+
+  function promptAddCategory() {
+    var name = prompt("Nombre de la nueva categoría / sobre:");
+    if (!name || name.trim() === "") return;
+    var limit = parseFloat(prompt("Tope presupuestado semanal (S/):", "50.00")) || 0;
+    state.limits[name.trim()] = limit;
+    localStorage.setItem('ctrl_gastos_state', JSON.stringify(state));
+    loadPlanSliders();
+    populateCatSelect();
     render();
   }
 
