@@ -183,7 +183,7 @@
     </div>
   </div>
 
-  <!-- TAB 2: REGISTRO -->
+  <!-- TAB 2: REGISTRO (CON SOPORTE DIRECTO DE PAGO DE PROVISIONES/DEUDAS) -->
   <div id="tab-add" class="tab-content">
     <div class="header"><h1>Registrar Movimiento</h1></div>
     <div class="card">
@@ -193,9 +193,16 @@
       <label>Tipo de Operación</label>
       <select id="tx-type" onchange="toggleTxForm()">
         <option value="gasto">Gasto Habitual</option>
+        <option value="pago_fijo">Pagar Provisión / Compromiso (Cochera, Deuda)</option>
         <option value="ingreso">Ingreso (Sueldo o Bono)</option>
         <option value="transfer">Transferencia entre Cuentas</option>
       </select>
+
+      <!-- SELECCIÓN DIRECTA DE PAGO FIJO (AUTO-COMPLETA NOMBRE Y MONTO) -->
+      <div id="grp-pago-fijo" style="display:none;">
+        <label>Compromiso a Pagar</label>
+        <select id="fixed-item-select" onchange="autoFillFixedItem()"></select>
+      </div>
 
       <div id="grp-transfer" style="display:none;">
         <label>De Cuenta</label>
@@ -256,13 +263,13 @@
     </div>
 
     <div class="card">
-      <span style="font-size:0.8rem; font-weight:700; margin-bottom:8px; display:block;">Provisiones Mensuales (Cochera S/ 250)</span>
+      <span style="font-size:0.8rem; font-weight:700; margin-bottom:8px; display:block;">Provisiones Mensuales (Cochera S/ 150)</span>
       <div id="provs-list"></div>
       <div style="border-top:1px solid var(--border); padding-top:8px; margin-top:8px;">
         <label>Nombre del Servicio</label>
         <input type="text" id="new-prov-name" placeholder="Ej. Cochera">
         <div class="grid-2">
-          <div><label>Monto Mensual (S/)</label><input type="number" id="new-prov-amt" placeholder="Ej. 250.00"></div>
+          <div><label>Monto Mensual (S/)</label><input type="number" id="new-prov-amt" placeholder="150.00"></div>
           <div><label>Fecha Vencimiento</label><input type="date" id="new-prov-date"></div>
         </div>
         <button class="btn-main" onclick="addProvision()">+ Guardar Provisión</button>
@@ -317,8 +324,8 @@
 
 <script>
   var DRIVE_API_URL = "https://script.google.com/macros/s/AKfycbw2KxHq4aC_xk72pXDMlAF5c7gGIMrNLEZnP6Y9Q5TYaLkQJmksx4QZ-RivPsNNeB8/exec";
-  var APP_VERSION = "v4.2_clean_privacy";
-  var isPrivacy = false; // Siempre visible por defecto
+  var APP_VERSION = "v4.4_pay_provisions_in_register";
+  var isPrivacy = false;
   var myChart = null;
   var chartFilter = 'ciclo';
   var histFilter = 'hoy';
@@ -336,7 +343,7 @@
       "Margen Libre": 10 
     },
     provisions: [
-      { id: 1, name: "Cochera", amount: 250.00, dueDate: "2026-10-28", isPaid: true, paidAt: Date.now() }
+      { id: 1, name: "Cochera", amount: 150.00, dueDate: "2026-10-15", isPaid: false }
     ],
     debts: [
       { id: 1, name: "Préstamo", amount: 200.00, dueDate: "2026-11-04", isPaid: false, isSingle: false },
@@ -518,7 +525,6 @@
     return isPrivacy ? 'S/ ••••' : 'S/ ' + Number(val || 0).toFixed(2);
   }
 
-  // FUNCIÓN CORREGIDA: Alterna limpia y directamente
   function togglePrivacy() {
     isPrivacy = !isPrivacy;
     var btn = document.getElementById('btn-privacy');
@@ -534,6 +540,7 @@
     if (btn) btn.classList.add('active');
     if (id === 'add') {
       populateCatSelect();
+      populateFixedSelect();
       initDateField();
     }
     if (id === 'plan') loadPlanSliders();
@@ -609,7 +616,13 @@
     var t = document.getElementById('tx-type').value;
     document.getElementById('grp-transfer').style.display = (t === 'transfer') ? 'block' : 'none';
     document.getElementById('grp-single').style.display = (t !== 'transfer') ? 'block' : 'none';
+    document.getElementById('grp-pago-fijo').style.display = (t === 'pago_fijo') ? 'block' : 'none';
     document.getElementById('grp-cat').style.display = (t === 'gasto') ? 'block' : 'none';
+
+    if (t === 'pago_fijo') {
+      populateFixedSelect();
+      autoFillFixedItem();
+    }
   }
 
   function populateCatSelect() {
@@ -633,6 +646,50 @@
     });
   }
 
+  // LLENAR LISTA DE COMPROMISOS / PROVISIONES EN REGISTRO
+  function populateFixedSelect() {
+    var sel = document.getElementById('fixed-item-select');
+    if (!sel) return;
+    sel.innerHTML = '';
+
+    (state.provisions || []).forEach(function(p) {
+      var opt = document.createElement('option');
+      opt.value = 'prov_' + p.id;
+      opt.textContent = 'Provisión: ' + p.name + ' (S/ ' + p.amount.toFixed(2) + ')' + (p.isPaid ? ' [Ya pagado]' : '');
+      sel.appendChild(opt);
+    });
+
+    (state.debts || []).forEach(function(d) {
+      var opt = document.createElement('option');
+      opt.value = 'debt_' + d.id;
+      opt.textContent = 'Compromiso: ' + d.name + ' (S/ ' + d.amount.toFixed(2) + ')' + (d.isPaid ? ' [Ya pagado]' : '');
+      sel.appendChild(opt);
+    });
+  }
+
+  // AUTOCOMPLETAR NOMBRE Y MONTO AL ELEGIR UN COMPROMISO
+  function autoFillFixedItem() {
+    var sel = document.getElementById('fixed-item-select');
+    if (!sel || !sel.value) return;
+
+    var val = sel.value;
+    if (val.startsWith('prov_')) {
+      var pId = val.replace('prov_', '');
+      var foundP = (state.provisions || []).find(function(x) { return String(x.id) === String(pId); });
+      if (foundP) {
+        document.getElementById('tx-desc').value = 'Pago ' + foundP.name;
+        document.getElementById('tx-amount').value = foundP.amount.toFixed(2);
+      }
+    } else if (val.startsWith('debt_')) {
+      var dId = val.replace('debt_', '');
+      var foundD = (state.debts || []).find(function(x) { return String(x.id) === String(dId); });
+      if (foundD) {
+        document.getElementById('tx-desc').value = 'Pago ' + foundD.name;
+        document.getElementById('tx-amount').value = foundD.amount.toFixed(2);
+      }
+    }
+  }
+
   function submitTx() {
     var type = document.getElementById('tx-type').value;
     var desc = document.getElementById('tx-desc').value.trim();
@@ -648,7 +705,7 @@
 
     var txObj = {
       id: String(Date.now()),
-      type: type,
+      type: (type === 'pago_fijo') ? 'gasto' : type,
       desc: desc,
       amount: amt,
       category: 'Otros',
@@ -666,6 +723,23 @@
       state.accounts[to] += amt;
       txObj.category = 'Transferencia';
       txObj.account = 'De ' + from + ' a ' + to;
+    } else if (type === 'pago_fijo') {
+      var accFijo = document.getElementById('tx-account').value;
+      txObj.account = accFijo === 'cash' ? 'Efectivo' : (accFijo === 'bank' ? 'Banco/Yape' : 'Reserva');
+      state.accounts[accFijo] -= amt;
+
+      var selFixed = document.getElementById('fixed-item-select').value;
+      if (selFixed.startsWith('prov_')) {
+        var pId = selFixed.replace('prov_', '');
+        var curP = (state.provisions || []).find(function(x) { return String(x.id) === String(pId); });
+        if (curP) { curP.isPaid = true; curP.paidAt = Date.now(); }
+        txObj.category = 'Servicios';
+      } else if (selFixed.startsWith('debt_')) {
+        var dId = selFixed.replace('debt_', '');
+        var curD = (state.debts || []).find(function(x) { return String(x.id) === String(dId); });
+        if (curD) { curD.isPaid = true; curD.paidAt = Date.now(); }
+        txObj.category = 'Deudas';
+      }
     } else {
       var acc = document.getElementById('tx-account').value;
       txObj.account = acc === 'cash' ? 'Efectivo' : (acc === 'bank' ? 'Banco/Yape' : 'Reserva');
